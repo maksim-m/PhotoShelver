@@ -11,7 +11,7 @@ namespace PhotoImporter.Core;
 /// </summary>
 public sealed partial class FolderTemplate
 {
-    public const string Default = "YYYY/MM-DD";
+    public const string Default = "YYYY/YYYY-MM-DD";
 
     private enum TokenKind { Literal, Year4, Year2, MonthName, Month, Day }
 
@@ -136,9 +136,9 @@ public sealed partial class FolderTemplate
     /// <summary>Ready-made templates offered in the UI.</summary>
     public static IReadOnlyList<string> Presets { get; } =
     [
+        "YYYY/YYYY-MM-DD",
         "YYYY/MM-DD",
         "YYYY/MM/DD",
-        "YYYY/YYYY-MM-DD",
         "YYYY-MM-DD",
         "YYYY/MM",
         "YYYY/MMM",

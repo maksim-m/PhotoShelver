@@ -256,7 +256,7 @@
                 <CheckBox DockPanel.Dock="Bottom" Content="Показать всё дерево" IsChecked="{Binding ShowFullTree}" Margin="0,12,0,0" HorizontalAlignment="Left"/>
 
                 <Grid>
-                    <TreeView ItemsSource="{Binding Tree}" BorderThickness="0" Background="Transparent">
+                    <TreeView x:Name="TargetTree" ItemsSource="{Binding Tree}" BorderThickness="0" Background="Transparent">
                         <TreeView.ItemContainerStyle>
                             <Style TargetType="TreeViewItem" BasedOn="{StaticResource {x:Type TreeViewItem}}">
                                 <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>

@@ -64,7 +64,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string _templateText = FolderTemplate.Default;
     [ObservableProperty] private bool _includeSubfolders = true;
     [ObservableProperty] [NotifyPropertyChangedFor(nameof(IsCopyMode))] private bool _isMoveMode = true;
-    [ObservableProperty] private bool _showFullTree;
+    [ObservableProperty] private bool _showFullTree = true;
 
     public bool IsCopyMode
     {
@@ -76,6 +76,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     {
         if (_initializing) return;
         _collapsedDays.Clear();
+        _treeScrollKey = null;
         StartScan();
     }
 
@@ -85,6 +86,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     {
         if (_initializing) return;
         Notice = null;
+        ResetTreeView();
         _ = RunDuplicateCheckAsync();
     }
 
@@ -92,6 +94,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     {
         ParseTemplate(value);
         if (_initializing) return;
+        ResetTreeView();
         _templateTimer.Stop();
         _templateTimer.Start();
         UpdateState();
@@ -122,7 +125,12 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         .Select(p => new TemplatePreset(p, FolderTemplate.Parse(p).Format(DateTime.Now)))
         .ToList();
 
-    partial void OnShowFullTreeChanged(bool value) { if (!_initializing) ScheduleRefresh(); }
+    partial void OnShowFullTreeChanged(bool value)
+    {
+        if (_initializing) return;
+        _treeScrollKey = null; // scroll to the first destination again in the new layout
+        ScheduleRefresh();
+    }
 
     partial void OnIsMoveModeChanged(bool value) { if (!_initializing) Notice = null; }
 
@@ -597,8 +605,24 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         {
             var nodes = await Task.Run(() => FolderTree.Build(target, destinations, full, template.Depth, cts.Token), cts.Token);
             if (cts != _treeCts) return;
+            var roots = nodes.Select(n => new FolderNodeViewModel(n, null, _treeExpansion, (path, expanded) => _treeExpansion[path] = expanded)).ToList();
+
+            // Nothing will be added: open the most recent top-level folder so the current structure is visible.
+            var firstAddition = FirstAddition(roots);
+            if (firstAddition is null && roots.Count > 0 && !_treeExpansion.ContainsKey(roots[^1].FullPath))
+                roots[^1].SetDefaultExpanded(true);
+
             Tree.Clear();
-            foreach (var node in nodes) Tree.Add(new FolderNodeViewModel(node));
+            foreach (var root in roots) Tree.Add(root);
+
+            // Scroll only when the first destination folder changes, so ticking files does not make the tree jump.
+            var scrollKey = firstAddition?.FullPath ?? "";
+            if (!string.Equals(scrollKey, _treeScrollKey, StringComparison.OrdinalIgnoreCase))
+            {
+                _treeScrollKey = scrollKey;
+                if (firstAddition is not null) ScrollTreeRequested?.Invoke(firstAddition.PathFromRoot());
+            }
+
             TreePlaceholder = nodes.Count > 0 ? null
                 : IsScanning ? "Читаю файлы источника…"
                 : string.IsNullOrWhiteSpace(SourcePath) ? "Выберите источник, чтобы увидеть, куда попадут файлы"
@@ -609,6 +633,33 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         catch (OperationCanceledException)
         {
         }
+    }
+
+    /// <summary>User's manual expand/collapse per folder path; reset when the target or template changes.</summary>
+    private readonly Dictionary<string, bool> _treeExpansion = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>The folder the tree was last scrolled to ("" = none); a change triggers a new scroll.</summary>
+    private string? _treeScrollKey;
+
+    /// <summary>Asks the view to scroll the tree so that the last node of the path is near the top.</summary>
+    public event Action<IReadOnlyList<FolderNodeViewModel>>? ScrollTreeRequested;
+
+    /// <summary>
+    /// First folder (in display order) that receives files: follow nodes with additions down to the
+    /// actual destination folder, stopping at a node the user collapsed.
+    /// </summary>
+    private static FolderNodeViewModel? FirstAddition(IEnumerable<FolderNodeViewModel> roots)
+    {
+        var node = roots.FirstOrDefault(n => n.HasCount);
+        while (node is { IsExpanded: true } && node.Children.FirstOrDefault(c => c.HasCount) is { } child)
+            node = child;
+        return node;
+    }
+
+    private void ResetTreeView()
+    {
+        _treeExpansion.Clear();
+        _treeScrollKey = null;
     }
 
     private bool IsNested() =>

@@ -10,7 +10,7 @@ public sealed class AppSettings
     public string Template { get; set; } = FolderTemplate.Default;
     public bool IncludeSubfolders { get; set; } = true;
     public bool MoveMode { get; set; } = true;
-    public bool ShowFullTree { get; set; }
+    public bool ShowFullTree { get; set; } = true;
     public double WindowWidth { get; set; } = 1280;
     public double WindowHeight { get; set; } = 820;
     public bool WindowMaximized { get; set; }

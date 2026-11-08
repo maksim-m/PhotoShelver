@@ -68,7 +68,8 @@ public class FolderTemplateTests
     [Fact]
     public void PresetsAreValidAndUnambiguous()
     {
-        Assert.Contains(FolderTemplate.Default, FolderTemplate.Presets);
+        Assert.Equal(FolderTemplate.Default, FolderTemplate.Presets[0]); // default is listed first
+        Assert.Equal(@"2026\2026-03-07", FolderTemplate.Parse(FolderTemplate.Default).Format(Date));
         Assert.All(FolderTemplate.Presets, p => Assert.Null(FolderTemplate.Parse(p).Warning));
         Assert.Equal(FolderTemplate.Presets.Count, FolderTemplate.Presets.Select(p => FolderTemplate.Parse(p).Format(Date)).Distinct().Count());
     }
