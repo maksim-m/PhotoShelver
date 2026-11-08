@@ -121,17 +121,13 @@ public sealed partial class MediaItemViewModel : ObservableObject
         }
     }
 
-    /// <summary>Called after a duplicate check; resets selection to the default when the status changed.</summary>
-    internal void ApplyDuplicate(DuplicateInfo? info, bool forceDefaultSelection)
+    /// <summary>Called after every duplicate check: selection is reset to the default "all new files".</summary>
+    internal void ApplyDuplicate(DuplicateInfo? info)
     {
-        var changed = Duplicate?.State != info?.State;
         Duplicate = info;
         OnPropertyChanged(nameof(IsNew));
         OnPropertyChanged(nameof(HasError));
         OnPropertyChanged(nameof(CanBeImported));
-        if (changed || forceDefaultSelection)
-            IsSelected = IsNew;
-        else if (!CanBeImported)
-            IsSelected = false;
+        IsSelected = IsNew;
     }
 }

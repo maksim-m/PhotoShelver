@@ -232,7 +232,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     }
 
     private bool CanImport() =>
-        !IsBusy && BlockingReason is null && _template is not null && SelectedCount > 0
+        !IsBusy && _duplicatesChecked && BlockingReason is null && _template is not null && SelectedCount > 0
         && Directory.Exists(SourcePath) && Directory.Exists(TargetPath);
 
     [RelayCommand(CanExecute = nameof(CanImport))]
@@ -363,16 +363,19 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
                 .ThenBy(i => i.File.Date?.Local)
                 .ThenBy(i => i.FileName, StringComparer.OrdinalIgnoreCase)
                 .ToList();
+            // Show files as selected right away; the duplicate check then unticks duplicates
+            // (import stays disabled until it has finished).
+            foreach (var item in _items) item.IsSelected = item.CanBeImported;
             SourcePlaceholder = _items.Count == 0 ? "В этой папке нет фото и видео" : null;
             RebuildRows();
 
             IsScanning = false;
-            await RunDuplicateCheckAsync(forceDefaultSelection: true);
+            await RunDuplicateCheckAsync();
         }
         catch (OperationCanceledException)
         {
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException)
+        catch (Exception ex)
         {
             if (cts == _scanCts) Notice = $"Не удалось прочитать папку-источник: {ex.Message}";
         }
@@ -388,18 +391,23 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _thumbnails.ClearQueue();
         foreach (var item in _items) item.IsAlive = false;
         _items = [];
+        _duplicatesChecked = false;
         _skippedOther = 0;
         Rows.Clear();
         HasGroups = false;
         ScheduleRefresh();
     }
 
-    private async Task RunDuplicateCheckAsync(bool forceDefaultSelection = false)
+    /// <summary>True once the current items went through a successful duplicate check (required to import).</summary>
+    private bool _duplicatesChecked;
+
+    private async Task RunDuplicateCheckAsync()
     {
         _duplicateCts?.Cancel();
         var cts = _duplicateCts = new CancellationTokenSource();
         var token = cts.Token;
         var items = _items;
+        _duplicatesChecked = false;
         if (items.Count == 0 || IsScanning)
         {
             ScheduleRefresh();
@@ -425,10 +433,16 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             var result = await Task.Run(() => DuplicateDetector.Detect(files, target, template, _hashCache, progress, token), token);
             if (cts != _duplicateCts || items != _items) return;
             foreach (var item in items)
-                item.ApplyDuplicate(result.GetValueOrDefault(item.File), forceDefaultSelection);
+                item.ApplyDuplicate(result.GetValueOrDefault(item.File));
+            _duplicatesChecked = true;
         }
         catch (OperationCanceledException)
         {
+        }
+        catch (Exception ex)
+        {
+            // Without a duplicate check we cannot promise not to re-import files: block the import and say why.
+            if (cts == _duplicateCts) Notice = $"Не удалось проверить дубликаты, импорт недоступен: {ex.Message}";
         }
         finally
         {
