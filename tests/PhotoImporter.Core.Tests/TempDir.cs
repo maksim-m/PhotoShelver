@@ -28,6 +28,15 @@ internal sealed class TempDir : IDisposable
 
     public void Dispose()
     {
-        try { Directory.Delete(Path, recursive: true); } catch (IOException) { }
+        try
+        {
+            foreach (var f in Directory.EnumerateFiles(Path, "*", SearchOption.AllDirectories))
+                System.IO.File.SetAttributes(f, FileAttributes.Normal);
+            Directory.Delete(Path, recursive: true);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Leftovers in %TEMP% are harmless.
+        }
     }
 }

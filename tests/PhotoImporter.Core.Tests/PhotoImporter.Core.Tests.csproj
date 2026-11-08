@@ -12,6 +12,9 @@
     <Using Include="Xunit" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="Fixtures\media\**\*" CopyToOutputDirectory="PreserveNewest" LinkBase="Fixtures\media" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\..\src\PhotoImporter.Core\PhotoImporter.Core.csproj" />
   </ItemGroup>
 </Project>

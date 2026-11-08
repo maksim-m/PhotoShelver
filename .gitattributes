@@ -3,3 +3,12 @@
 *.xaml text eol=crlf
 *.csproj text eol=crlf
 *.sln text eol=crlf
+*.jpg binary
+*.JPG binary
+*.jpeg binary
+*.png binary
+*.PNG binary
+*.mp4 binary
+*.MP4 binary
+*.mov binary
+*.MOV binary
