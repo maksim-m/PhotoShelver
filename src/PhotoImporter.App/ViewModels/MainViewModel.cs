@@ -148,8 +148,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string? _sourcePlaceholder = "Выберите папку с фото и видео";
     [ObservableProperty] private string? _treePlaceholder;
 
-    [ObservableProperty] [NotifyPropertyChangedFor(nameof(ShowScanProgress))] private bool _isScanning;
-    [ObservableProperty] [NotifyPropertyChangedFor(nameof(ShowScanProgress))] private bool _isCheckingDuplicates;
+    [ObservableProperty] private bool _isScanning;
+    [ObservableProperty] private bool _isCheckingDuplicates;
     [ObservableProperty] private string? _scanStatus;
     [ObservableProperty] private double _scanProgress;
     [ObservableProperty] private bool _scanIndeterminate;
@@ -167,11 +167,14 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     public bool IsIdle => !IsImporting;
 
-    public bool ShowScanProgress => IsScanning || IsCheckingDuplicates;
 
     public int SelectedCount { get; private set; }
 
-    partial void OnIsScanningChanged(bool value) => UpdateState();
+    partial void OnIsScanningChanged(bool value)
+    {
+        UpdateState();
+        ScheduleRefresh(); // tree placeholder depends on the scan state
+    }
     partial void OnIsCheckingDuplicatesChanged(bool value) => UpdateState();
     partial void OnIsImportingChanged(bool value)
     {
@@ -588,6 +591,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
         var destinations = selected.Select(i => template.Format(i.File.Date!.Value.Local)).ToList();
         var full = ShowFullTree;
+        // Building the tree touches the target disk and can be slow while it is busy (e.g. hashing).
+        if (Tree.Count == 0 && (destinations.Count > 0 || full)) TreePlaceholder = "Строю дерево папок…";
         try
         {
             var nodes = await Task.Run(() => FolderTree.Build(target, destinations, full, template.Depth, cts.Token), cts.Token);
@@ -595,7 +600,10 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             Tree.Clear();
             foreach (var node in nodes) Tree.Add(new FolderNodeViewModel(node));
             TreePlaceholder = nodes.Count > 0 ? null
-                : _items.Count == 0 ? "Выберите источник, чтобы увидеть, куда попадут файлы"
+                : IsScanning ? "Читаю файлы источника…"
+                : string.IsNullOrWhiteSpace(SourcePath) ? "Выберите источник, чтобы увидеть, куда попадут файлы"
+                : !Directory.Exists(SourcePath) ? "Папка-источник не найдена"
+                : _items.Count == 0 ? "В источнике нет фото и видео"
                 : "Нет файлов для импорта";
         }
         catch (OperationCanceledException)

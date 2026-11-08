@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:PhotoImporter.App"
         xmlns:vm="clr-namespace:PhotoImporter.App.ViewModels"
+        xmlns:controls="clr-namespace:PhotoImporter.App.Controls"
         Title="PhotoImporter" Width="1280" Height="820" MinWidth="960" MinHeight="600"
         WindowStartupLocation="CenterScreen">
     <Window.Resources>
@@ -168,7 +169,7 @@
                 </DockPanel>
 
                 <StackPanel DockPanel.Dock="Bottom" Margin="0,12,0,0">
-                    <StackPanel Visibility="{Binding ShowScanProgress, Converter={StaticResource BoolToVis}}" Margin="0,0,0,8">
+                    <StackPanel Visibility="{Binding IsCheckingDuplicates, Converter={StaticResource BoolToVis}}" Margin="0,0,0,8">
                         <TextBlock Text="{Binding ScanStatus}" Style="{StaticResource Secondary}" Margin="0,0,0,4"/>
                         <ProgressBar Value="{Binding ScanProgress, Mode=OneWay}" Maximum="1" IsIndeterminate="{Binding ScanIndeterminate}" Height="4"/>
                     </StackPanel>
@@ -208,6 +209,13 @@
                     <TextBlock Text="{Binding SourcePlaceholder}" Style="{StaticResource Secondary}" FontSize="16"
                                HorizontalAlignment="Center" VerticalAlignment="Center"
                                Visibility="{Binding SourcePlaceholder, Converter={StaticResource NotNullToVis}}"/>
+                    <!-- While the source is being read there are no tiles yet: show a big progress ring in the middle -->
+                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"
+                                Visibility="{Binding IsScanning, Converter={StaticResource BoolToVis}}">
+                        <controls:ProgressRing Width="88" Height="88" Thickness="7" HorizontalAlignment="Center"
+                                               Value="{Binding ScanProgress}" IsIndeterminate="{Binding ScanIndeterminate}"/>
+                        <TextBlock Text="{Binding ScanStatus}" FontSize="15" HorizontalAlignment="Center" Margin="0,16,0,0"/>
+                    </StackPanel>
                 </Grid>
             </DockPanel>
         </Border>
