@@ -161,12 +161,28 @@
                     <TextBox Text="{Binding TargetPath, Mode=OneWay}" IsReadOnly="True" VerticalContentAlignment="Center"/>
                 </DockPanel>
                 <TextBlock DockPanel.Dock="Top" Text="Шаблон папок" Margin="0,0,0,4"/>
-                <TextBox DockPanel.Dock="Top" Text="{Binding TemplateText, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding IsIdle}"
-                         ToolTip="YYYY — год, YY — год (2 цифры), MM — месяц, MMM — месяц (Jan…Dec), DD — день, / — вложенная папка"/>
+                <ComboBox DockPanel.Dock="Top" IsEditable="True" IsTextSearchEnabled="False" TextSearch.TextPath="Pattern" IsEnabled="{Binding IsIdle}"
+                          ItemsSource="{Binding TemplatePresets}"
+                          Text="{Binding TemplateText, UpdateSourceTrigger=PropertyChanged}"
+                          ToolTip="Выберите вариант или введите свой. YYYY — год, YY — год (2 цифры), MM — месяц, MMM — месяц (Jan…Dec), DD — день, / — вложенная папка">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <DockPanel MinWidth="260">
+                                <TextBlock DockPanel.Dock="Right" Text="{Binding Example}" Style="{StaticResource Secondary}" Margin="24,0,0,0"/>
+                                <TextBlock Text="{Binding Pattern}" FontWeight="SemiBold"/>
+                            </DockPanel>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
                 <TextBlock DockPanel.Dock="Top" Text="{Binding TemplateExample}" Style="{StaticResource Secondary}" Margin="0,4,0,0"
                            Visibility="{Binding TemplateExample, Converter={StaticResource NotNullToVis}}"/>
                 <TextBlock DockPanel.Dock="Top" Text="{Binding TemplateError}" Foreground="{DynamicResource SystemFillColorCriticalBrush}" Margin="0,4,0,0"
                            TextWrapping="Wrap" Visibility="{Binding TemplateError, Converter={StaticResource NotNullToVis}}"/>
+                <DockPanel DockPanel.Dock="Top" Margin="0,4,0,0" Visibility="{Binding TemplateWarning, Converter={StaticResource NotNullToVis}}">
+                    <TextBlock DockPanel.Dock="Left" Text="&#xE7BA;" FontFamily="{StaticResource IconFont}" Margin="0,2,6,0"
+                               Foreground="{DynamicResource SystemFillColorCautionBrush}"/>
+                    <TextBlock Text="{Binding TemplateWarning}" TextWrapping="Wrap"/>
+                </DockPanel>
                 <TextBlock DockPanel.Dock="Top" Text="YYYY · YY · MM · MMM · DD · / — новый уровень" Style="{StaticResource Secondary}" FontSize="12" Margin="0,2,0,12"/>
 
                 <CheckBox DockPanel.Dock="Bottom" Content="Показать всё дерево" IsChecked="{Binding ShowFullTree}" Margin="0,12,0,0" HorizontalAlignment="Left"/>

@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace PhotoImporter.Core;
 
@@ -8,7 +9,7 @@ namespace PhotoImporter.Core;
 /// Tokens (case-sensitive): YYYY, YY, MMM, MM, DD. '/' or '\' starts a new folder level.
 /// Everything else is literal text.
 /// </summary>
-public sealed class FolderTemplate
+public sealed partial class FolderTemplate
 {
     public const string Default = "YYYY/MM-DD";
 
@@ -49,11 +50,33 @@ public sealed class FolderTemplate
             return false;
         }
 
+        if (pattern.Length > MaxLength)
+        {
+            error = $"Шаблон слишком длинный (больше {MaxLength} символов)";
+            return false;
+        }
+
         var bad = pattern.IndexOfAny(InvalidChars);
         if (bad >= 0 || pattern.Any(char.IsControl))
         {
             error = $"Недопустимый символ: {(bad >= 0 ? pattern[bad].ToString() : "управляющий символ")}";
             return false;
+        }
+
+        // Runs like YYY, MMMM or DDD are almost certainly typos (they would render as "26Y", "NovM", "08D").
+        foreach (Match run in TokenLetterRuns().Matches(pattern))
+        {
+            var ok = run.Value[0] switch
+            {
+                'Y' => run.Length is 1 or 2 or 4,
+                'M' => run.Length is 1 or 2 or 3,
+                _ => run.Length is 1 or 2,
+            };
+            if (!ok)
+            {
+                error = $"Непонятный токен «{run.Value}». Доступны: YYYY, YY, MM, MMM, DD";
+                return false;
+            }
         }
 
         var segments = new List<List<Token>>();
@@ -77,6 +100,15 @@ public sealed class FolderTemplate
             segments.Add(Tokenize(raw));
         }
 
+        var kinds = segments.SelectMany(s => s).Select(t => t.Kind).Where(k => k != TokenKind.Literal).ToHashSet();
+        if (kinds.Count == 0)
+        {
+            error = LowercaseTokens().IsMatch(pattern)
+                ? "Токены пишутся заглавными буквами: YYYY, YY, MM, MMM, DD"
+                : "В шаблоне нет даты. Добавьте хотя бы один токен: YYYY, YY, MM, MMM, DD";
+            return false;
+        }
+
         var candidate = new FolderTemplate(pattern, segments);
         foreach (var name in candidate.Format(new DateTime(2026, 1, 1)).Split('\\'))
         {
@@ -87,9 +119,38 @@ public sealed class FolderTemplate
             }
         }
 
+        var hasYear = kinds.Contains(TokenKind.Year4) || kinds.Contains(TokenKind.Year2);
+        var hasMonth = kinds.Contains(TokenKind.Month) || kinds.Contains(TokenKind.MonthName);
+        if (kinds.Contains(TokenKind.Day) && !hasMonth)
+            candidate.Warning = "Нет месяца (MM или MMM): в одну папку попадут файлы одного числа разных месяцев";
+        else if (hasMonth && !hasYear)
+            candidate.Warning = "Нет года (YYYY или YY): в одну папку попадут файлы одного месяца разных лет";
+
         template = candidate;
         return true;
     }
+
+    /// <summary>Non-blocking remark about a valid but probably unintended template (or null).</summary>
+    public string? Warning { get; private set; }
+
+    /// <summary>Ready-made templates offered in the UI.</summary>
+    public static IReadOnlyList<string> Presets { get; } =
+    [
+        "YYYY/MM-DD",
+        "YYYY/MM/DD",
+        "YYYY/YYYY-MM-DD",
+        "YYYY-MM-DD",
+        "YYYY/MM",
+        "YYYY/MMM",
+    ];
+
+    private const int MaxLength = 200;
+
+    [GeneratedRegex("Y+|M+|D+")]
+    private static partial Regex TokenLetterRuns();
+
+    [GeneratedRegex("yyyy|yy|mm|dd", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex LowercaseTokens();
 
     public static FolderTemplate Parse(string pattern) =>
         TryParse(pattern, out var t, out var error) ? t! : throw new FormatException(error);

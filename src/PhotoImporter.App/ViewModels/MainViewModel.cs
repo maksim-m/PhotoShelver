@@ -98,15 +98,24 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         {
             _template = template;
             TemplateError = null;
-            TemplateExample = "Пример: " + template!.Format(DateTime.Now);
+            TemplateWarning = template!.Warning;
+            TemplateExample = "Пример: " + template.Format(DateTime.Now);
         }
         else
         {
             _template = null;
             TemplateError = error;
+            TemplateWarning = null;
             TemplateExample = null;
         }
     }
+
+    [ObservableProperty] private string? _templateWarning;
+
+    /// <summary>Ready-made templates for the drop-down, with an example for today.</summary>
+    public IReadOnlyList<TemplatePreset> TemplatePresets { get; } = FolderTemplate.Presets
+        .Select(p => new TemplatePreset(p, FolderTemplate.Parse(p).Format(DateTime.Now)))
+        .ToList();
 
     partial void OnShowFullTreeChanged(bool value) { if (!_initializing) ScheduleRefresh(); }
 
