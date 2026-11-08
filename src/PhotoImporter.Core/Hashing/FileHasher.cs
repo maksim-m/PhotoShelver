@@ -6,6 +6,9 @@ using Microsoft.Win32.SafeHandles;
 
 namespace PhotoImporter.Core.Hashing;
 
+/// <param name="BypassedCache">True when the data was read from the device itself, not from the Windows cache.</param>
+public readonly record struct DiskHash(UInt128 Hash, bool BypassedCache);
+
 public static class FileHasher
 {
     internal const int BufferSize = 1024 * 1024;
@@ -19,12 +22,15 @@ public static class FileHasher
     /// <summary>
     /// Hashes the file as stored on the device, bypassing the Windows file cache (FILE_FLAG_NO_BUFFERING),
     /// so a freshly written copy is really read back from disk and a source is really re-read from the card.
-    /// Falls back to a normal read when the file system does not allow unbuffered access.
+    /// When the file system does not allow unbuffered access the file is read normally and
+    /// <see cref="DiskHash.BypassedCache"/> is false (the check is then weaker and the caller should say so).
     /// </summary>
-    public static unsafe UInt128 HashFromDisk(string path, CancellationToken ct = default)
+    public static unsafe DiskHash HashFromDisk(string path, CancellationToken ct = default, bool forceCached = false)
     {
         const FileOptions noBuffering = (FileOptions)0x20000000;
         const int chunk = 1 << 20; // a multiple of every sector size
+        if (forceCached) return new DiskHash(Hash(path, ct), BypassedCache: false);
+
         SafeFileHandle handle;
         try
         {
@@ -32,8 +38,9 @@ public static class FileHasher
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
         {
-            if (ex is FileNotFoundException or DirectoryNotFoundException) throw;
-            return Hash(path, ct);
+            // Missing files and files locked by someone else are real errors, not "unbuffered I/O unsupported".
+            if (ex is FileNotFoundException or DirectoryNotFoundException || ex.HResult is unchecked((int)0x80070020) or unchecked((int)0x80070021)) throw;
+            return new DiskHash(Hash(path, ct), BypassedCache: false);
         }
 
         using (handle)
@@ -54,7 +61,7 @@ public static class FileHasher
                     offset += read;
                     if (read < chunk) break; // end of file
                 }
-                return hasher.GetCurrentHashAsUInt128();
+                return new DiskHash(hasher.GetCurrentHashAsUInt128(), BypassedCache: true);
             }
             finally
             {

@@ -88,6 +88,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         Notice = null;
         ResetTreeView();
         _ = RunDuplicateCheckAsync();
+        _ = FindLeftoversAsync();
     }
 
     partial void OnTemplateTextChanged(string value)
@@ -136,7 +137,66 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     partial void OnIsMoveModeChanged(bool value) { if (!_initializing) Notice = null; }
 
-    public void Initialize() => StartScan();
+    public void Initialize()
+    {
+        StartScan();
+        _ = FindLeftoversAsync();
+    }
+
+    // ---------- Leftovers of interrupted imports ----------
+
+    private List<string> _leftovers = [];
+    private CancellationTokenSource? _leftoverCts;
+
+    [ObservableProperty] private string? _leftoversText;
+
+    private async Task FindLeftoversAsync()
+    {
+        _leftoverCts?.Cancel();
+        var cts = _leftoverCts = new CancellationTokenSource();
+        var target = TargetPath;
+        if (string.IsNullOrWhiteSpace(target) || !Directory.Exists(target))
+        {
+            _leftovers = [];
+            LeftoversText = null;
+            return;
+        }
+        try
+        {
+            var found = await Task.Run(() => ImportLeftovers.Find(target, cts.Token), cts.Token);
+            if (cts != _leftoverCts) return;
+            _leftovers = found.Select(f => f.FullName).ToList();
+            LeftoversText = _leftovers.Count == 0 ? null
+                : $"В папке-цели {Format.Files(_leftovers.Count)} от прерванного импорта (*.importing). "
+                  + "Это лишние незавершённые копии: исходники для них не удалялись.";
+        }
+        catch (Exception ex) when (ex is OperationCanceledException or IOException or UnauthorizedAccessException)
+        {
+        }
+    }
+
+    [RelayCommand]
+    private void ShowLeftovers()
+    {
+        if (_leftovers.FirstOrDefault() is { } first)
+            System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{first}\"");
+    }
+
+    [RelayCommand(CanExecute = nameof(IsIdle))]
+    private async Task DeleteLeftoversAsync()
+    {
+        var answer = System.Windows.MessageBox.Show(
+            $"Удалить {Format.Files(_leftovers.Count)} *.importing, оставшихся от прерванного импорта?"
+            + Environment.NewLine + Environment.NewLine
+            + "Удаляются только файлы с именем вида «имя.xxxxxxxx.importing». Фото и видео не затрагиваются.",
+            "PhotoImporter", System.Windows.MessageBoxButton.YesNo, System.Windows.MessageBoxImage.Question);
+        if (answer != System.Windows.MessageBoxResult.Yes) return;
+
+        var failed = await Task.Run(() => ImportLeftovers.Delete(_leftovers));
+        if (failed.Count > 0)
+            Notice = $"Не удалось удалить {Format.Files(failed.Count)}: {failed[0].Error}";
+        await FindLeftoversAsync();
+    }
 
     public void SaveTo(AppSettings settings)
     {
@@ -313,6 +373,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         }
 
         ImportFinished?.Invoke(result, target);
+        _ = FindLeftoversAsync();
         StartScan();
     }
 

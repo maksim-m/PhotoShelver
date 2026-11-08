@@ -7,6 +7,14 @@
         <TextBlock x:Name="HeadlineText" DockPanel.Dock="Top" FontSize="20" FontWeight="SemiBold" Margin="0,0,0,8"/>
         <TextBlock x:Name="DetailsText" DockPanel.Dock="Top" TextWrapping="Wrap" Margin="0,0,0,12"
                    Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+        <Border x:Name="WarningsPanel" DockPanel.Dock="Top" Visibility="Collapsed" Margin="0,0,0,12" Padding="12,8" CornerRadius="6"
+                Background="{DynamicResource SystemFillColorCautionBackgroundBrush}">
+            <DockPanel>
+                <TextBlock DockPanel.Dock="Left" Text="&#xE7BA;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Margin="0,0,10,0"
+                           Foreground="{DynamicResource SystemFillColorCautionBrush}"/>
+                <TextBlock x:Name="WarningsText" TextWrapping="Wrap"/>
+            </DockPanel>
+        </Border>
         <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
             <Button Content="Открыть папку цели" Padding="16,6" Margin="0,0,8,0" Click="OpenTarget_Click"/>
             <Button Content="Закрыть" Padding="24,6" IsDefault="True" IsCancel="True" Style="{DynamicResource AccentButtonStyle}" Click="Close_Click"/>

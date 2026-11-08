@@ -19,10 +19,12 @@ public sealed record ImportFailure(string SourcePath, string Message);
 
 public sealed record ImportedFile(string SourcePath, string DestinationPath);
 
+/// <param name="Warnings">Non-fatal remarks about the import as a whole (e.g. a weaker verification on some volume).</param>
 public sealed record ImportResult(
     IReadOnlyList<ImportedFile> Imported,
     IReadOnlyList<ImportFailure> Failures,
-    bool Cancelled);
+    bool Cancelled,
+    IReadOnlyList<string> Warnings);
 
 /// <summary>
 /// Copies or moves files into the target, never overwriting anything (SPEC §7).
@@ -30,6 +32,7 @@ public sealed record ImportResult(
 public sealed class Importer
 {
     private const int MaxSuffix = 100_000;
+    private const int TempNameAttempts = 5;
     private static readonly TimeSpan ProgressInterval = TimeSpan.FromMilliseconds(100);
 
     /// <summary>Test hook: handle moves as cross-volume (copy + verify + delete).</summary>
@@ -47,6 +50,12 @@ public sealed class Importer
     /// <summary>Test hook: overrides the temp file name (file name → temp name).</summary>
     internal Func<string, string>? TempFileName { get; init; }
 
+    /// <summary>Test hook: pretend the file system does not support reading around the cache.</summary>
+    internal bool ForceCachedVerification { get; init; }
+
+    /// <summary>Waits between retries of operations blocked by another process (tests use short ones).</summary>
+    internal IReadOnlyList<TimeSpan> RetryDelays { get; init; } = TransientRetry.DefaultDelays;
+
     public ImportResult Run(
         IReadOnlyList<ImportJob> jobs,
         ImportMode mode,
@@ -55,6 +64,7 @@ public sealed class Importer
     {
         var imported = new List<ImportedFile>();
         var failures = new List<ImportFailure>();
+        var cachedVolumes = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
         var bytesTotal = jobs.Sum(j => j.Size);
         long bytesDone = 0;
         var clock = Stopwatch.StartNew();
@@ -67,17 +77,19 @@ public sealed class Importer
             progress?.Report(new ImportProgress(filesDone, jobs.Count, bytes, bytesTotal, current));
         }
 
+        ImportResult Result(bool cancelled) => new(imported, failures, cancelled, Warnings(cachedVolumes));
+
         for (var i = 0; i < jobs.Count; i++)
         {
             if (ct.IsCancellationRequested)
-                return new ImportResult(imported, failures, true);
+                return Result(cancelled: true);
 
             var job = jobs[i];
             var startBytes = bytesDone;
             Report(i, bytesDone, job.SourcePath, force: true);
             try
             {
-                ImportOne(job, mode, b => Report(i, startBytes + b, job.SourcePath), imported, failures);
+                ImportOne(job, mode, b => Report(i, startBytes + b, job.SourcePath), imported, failures, cachedVolumes);
             }
             catch (Exception ex) when (!IsFatal(ex))
             {
@@ -88,10 +100,16 @@ public sealed class Importer
         }
 
         Report(jobs.Count, bytesDone, null, force: true);
-        return new ImportResult(imported, failures, false);
+        return Result(cancelled: false);
     }
 
-    private void ImportOne(ImportJob job, ImportMode mode, Action<long> onBytes, List<ImportedFile> imported, List<ImportFailure> failures)
+    private static List<string> Warnings(IEnumerable<string> cachedVolumes) =>
+        cachedVolumes
+            .Select(v => $"Носитель «{v}» не поддерживает чтение в обход кэша Windows: проверка копий с него и на него слабее обычной. При перемещении исходники с такого носителя не удаляются.")
+            .ToList();
+
+    private void ImportOne(ImportJob job, ImportMode mode, Action<long> onBytes,
+        List<ImportedFile> imported, List<ImportFailure> failures, ISet<string> cachedVolumes)
     {
         var source = new FileInfo(job.SourcePath);
         if (!source.Exists)
@@ -112,13 +130,18 @@ public sealed class Importer
             return;
         }
 
-        var dest = CopyViaTemp(job, onBytes);
+        var (dest, sourceReadFromDevice) = CopyViaTemp(job, onBytes, cachedVolumes);
         imported.Add(new ImportedFile(job.SourcePath, dest));
         if (mode != ImportMode.Move) return;
 
         // Cross-volume move: delete the source only if it is exactly what was copied and verified.
         source.Refresh();
         if (!source.Exists) return;
+        if (!sourceReadFromDevice)
+        {
+            failures.Add(new ImportFailure(job.SourcePath, $"Скопирован в «{dest}», но исходный файл не удалён: носитель не позволяет надёжно перечитать его для проверки"));
+            return;
+        }
         if (source.Length != sizeBefore || source.LastWriteTimeUtc != writeTimeBefore)
         {
             failures.Add(new ImportFailure(job.SourcePath, $"Скопирован в «{dest}», но исходный файл изменился во время копирования и не удалён"));
@@ -126,7 +149,7 @@ public sealed class Importer
         }
         try
         {
-            File.Delete(job.SourcePath);
+            TransientRetry.Run(() => File.Delete(job.SourcePath), RetryDelays);
         }
         catch (Exception ex) when (!IsFatal(ex))
         {
@@ -147,24 +170,42 @@ public sealed class Importer
     }
 
     /// <summary>
-    /// Copies to a temporary *.importing file, verifies it, then renames it to a free name.
+    /// Copies to a temporary "&lt;name&gt;.&lt;8 hex&gt;.importing" file, verifies it, then renames it to a free name.
     /// Verification (both modes): the copy is read back from disk bypassing the cache, and the source is
     /// re-read from its device; both must match the data that was copied. On any mismatch nothing is placed.
+    /// Returns the placed path and whether the source re-read really came from the device.
     /// </summary>
-    private string CopyViaTemp(ImportJob job, Action<long> onBytes)
+    private (string Path, bool SourceReadFromDevice) CopyViaTemp(ImportJob job, Action<long> onBytes, ISet<string> cachedVolumes)
     {
         var fileName = Path.GetFileName(job.SourcePath);
-        var temp = Path.Combine(job.DestinationFolder, TempFileName?.Invoke(fileName) ?? $"{fileName}.{Guid.NewGuid():N}.importing");
+        string? temp = null;
         var ownsTemp = false; // only ever delete a temp file this call created
         try
         {
-            var copiedHash = CopyAndHash(job.SourcePath, temp, onBytes, () => ownsTemp = true);
+            UInt128 copiedHash = default;
+            for (var attempt = 1; ; attempt++)
+            {
+                temp = Path.Combine(job.DestinationFolder, TempFileName?.Invoke(fileName) ?? $"{fileName}.{Random.Shared.Next():x8}.importing");
+                try
+                {
+                    copiedHash = CopyAndHash(job.SourcePath, temp, onBytes, () => ownsTemp = true);
+                    break;
+                }
+                catch (IOException) when (!ownsTemp && File.Exists(temp) && attempt < TempNameAttempts)
+                {
+                    // The random temp name is taken (e.g. by a leftover): pick another one, never touch the existing file.
+                }
+            }
             AfterTempWritten?.Invoke(temp);
 
-            if (FileHasher.HashFromDisk(temp) != copiedHash)
+            var copyOnDisk = FileHasher.HashFromDisk(temp, forceCached: ForceCachedVerification);
+            if (copyOnDisk.Hash != copiedHash)
                 throw new InvalidDataException("Копия на диске не совпадает с прочитанными данными (ошибка записи). Файл не импортирован");
-            if (FileHasher.HashFromDisk(job.SourcePath) != copiedHash)
+            var sourceOnDevice = FileHasher.HashFromDisk(job.SourcePath, forceCached: ForceCachedVerification);
+            if (sourceOnDevice.Hash != copiedHash)
                 throw new InvalidDataException("Исходный файл при повторном чтении отличается от скопированного (нестабильное чтение или файл изменился). Файл не импортирован");
+            if (!copyOnDisk.BypassedCache) cachedVolumes.Add(VolumeLabel(job.DestinationFolder));
+            if (!sourceOnDevice.BypassedCache) cachedVolumes.Add(VolumeLabel(job.SourcePath));
 
             var src = new FileInfo(job.SourcePath);
             try
@@ -177,25 +218,29 @@ public sealed class Importer
                 // Timestamps are nice to have; some file systems reject them.
             }
 
-            var placed = PlaceWithSuffix(fileName, job.DestinationFolder, candidate => File.Move(temp, candidate, overwrite: false));
+            var tempPath = temp;
+            var placed = PlaceWithSuffix(fileName, job.DestinationFolder, candidate => File.Move(tempPath, candidate, overwrite: false));
             ownsTemp = false; // it has become the imported file
-            return placed;
+            return (placed, sourceOnDevice.BypassedCache);
         }
         finally
         {
-            if (ownsTemp)
+            if (ownsTemp && temp is not null)
             {
                 try
                 {
-                    File.Delete(temp);
+                    var tempPath = temp;
+                    TransientRetry.Run(() => File.Delete(tempPath), RetryDelays);
                 }
                 catch (Exception ex) when (!IsFatal(ex))
                 {
-                    // Best effort cleanup; a leftover *.importing file is ignored by the duplicate check.
+                    // Best effort cleanup; a leftover is reported by the app and ignored by the duplicate check.
                 }
             }
         }
     }
+
+    private static string VolumeLabel(string path) => Path.GetPathRoot(Path.GetFullPath(path)) ?? path;
 
     private UInt128 CopyAndHash(string source, string destination, Action<long> onBytes, Action created)
     {
@@ -230,6 +275,7 @@ public sealed class Importer
     /// <summary>
     /// Calls <paramref name="place"/> with name, name_1, name_2… until it succeeds.
     /// <paramref name="place"/> must fail (IOException) when the destination already exists.
+    /// A placement blocked by another process (antivirus, indexer) is retried on the same name.
     /// </summary>
     private string PlaceWithSuffix(string fileName, string folder, Action<string> place)
     {
@@ -240,7 +286,7 @@ public sealed class Importer
             try
             {
                 BeforePlace?.Invoke(candidate);
-                place(candidate);
+                TransientRetry.Run(() => place(candidate), RetryDelays);
                 return candidate;
             }
             catch (IOException) when (File.Exists(candidate) || Directory.Exists(candidate))

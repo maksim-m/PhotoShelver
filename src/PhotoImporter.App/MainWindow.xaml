@@ -254,6 +254,21 @@
                 <TextBlock DockPanel.Dock="Top" Text="YYYY · YY · MM · MMM · DD · / — новый уровень" Style="{StaticResource Secondary}" FontSize="12" Margin="0,2,0,12"/>
 
                 <CheckBox DockPanel.Dock="Bottom" Content="Показать всё дерево" IsChecked="{Binding ShowFullTree}" Margin="0,12,0,0" HorizontalAlignment="Left"/>
+                <Border DockPanel.Dock="Bottom" Margin="0,12,0,0" Padding="12,8" CornerRadius="6"
+                        Background="{DynamicResource SystemFillColorCautionBackgroundBrush}"
+                        Visibility="{Binding LeftoversText, Converter={StaticResource NotNullToVis}}">
+                    <StackPanel>
+                        <DockPanel>
+                            <TextBlock DockPanel.Dock="Left" Text="&#xE7BA;" FontFamily="{StaticResource IconFont}" FontSize="16" Margin="0,1,10,0"
+                                       Foreground="{DynamicResource SystemFillColorCautionBrush}"/>
+                            <TextBlock Text="{Binding LeftoversText}" TextWrapping="Wrap"/>
+                        </DockPanel>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                            <Button Content="Показать" Padding="12,4" Margin="0,0,8,0" Command="{Binding ShowLeftoversCommand}"/>
+                            <Button Content="Удалить" Padding="12,4" Command="{Binding DeleteLeftoversCommand}"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
 
                 <Grid>
                     <TreeView x:Name="TargetTree" ItemsSource="{Binding Tree}" BorderThickness="0" Background="Transparent">

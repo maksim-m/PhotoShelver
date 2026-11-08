@@ -13,13 +13,22 @@ public partial class ImportSummaryWindow : Window
         InitializeComponent();
         _targetFolder = targetFolder;
 
-        HeadlineText.Text = result.Cancelled ? "Импорт отменён" : result.Failures.Count == 0 ? "Импорт завершён" : "Импорт завершён с ошибками";
+        HeadlineText.Text = result.Cancelled ? "Импорт отменён"
+            : result.Failures.Count > 0 ? "Импорт завершён с ошибками"
+            : result.Warnings.Count > 0 ? "Импорт завершён с предупреждениями"
+            : "Импорт завершён";
         Title = HeadlineText.Text;
 
         var details = $"Импортировано: {Format.Files(result.Imported.Count)}.";
         if (result.Failures.Count > 0) details += $" Ошибок: {result.Failures.Count}.";
         if (result.Cancelled) details += " Оставшиеся файлы не тронуты.";
         DetailsText.Text = details;
+
+        if (result.Warnings.Count > 0)
+        {
+            WarningsText.Text = string.Join("\n\n", result.Warnings);
+            WarningsPanel.Visibility = Visibility.Visible;
+        }
 
         if (result.Failures.Count > 0)
         {

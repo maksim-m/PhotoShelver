@@ -26,7 +26,8 @@ public class PlacementAndRecoveryTests
         new Random(size).NextBytes(bytes);
         File.WriteAllBytes(path, bytes);
 
-        Assert.Equal(FileHasher.Hash(path), FileHasher.HashFromDisk(path));
+        // NTFS supports unbuffered reads, so the cache must really be bypassed here.
+        Assert.Equal(new DiskHash(FileHasher.Hash(path), BypassedCache: true), FileHasher.HashFromDisk(path));
     }
 
     [Fact]

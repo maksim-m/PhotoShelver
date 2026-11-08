@@ -11,6 +11,9 @@ public class ImporterSafetyTests
 {
     private static ImportJob Job(string src, string destFolder) => new(src, destFolder, new FileInfo(src).Length);
 
+    /// <summary>Short retry delays for tests that hold a file locked on purpose.</summary>
+    private static readonly TimeSpan[] Fast = [TimeSpan.FromMilliseconds(10), TimeSpan.FromMilliseconds(10)];
+
     [Theory]
     [InlineData(ImportMode.Copy)]
     [InlineData(ImportMode.Move)]
@@ -150,7 +153,7 @@ public class ImporterSafetyTests
 
         ImportResult result;
         using (new FileStream(src, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
-            result = new Importer { TreatAsDifferentVolumes = crossVolume }.Run([Job(src, dest)], mode, null, default);
+            result = new Importer { TreatAsDifferentVolumes = crossVolume, RetryDelays = Fast }.Run([Job(src, dest)], mode, null, default);
 
         Assert.Empty(result.Imported);
         Assert.Single(result.Failures);
@@ -269,7 +272,7 @@ public class ImporterSafetyTests
         var before = Snapshot.Take(Path.Combine(dir.Path, "src"));
 
         using (new FileStream(locked, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
-            new Importer().Run([Job(ok, dest), Job(locked, dest), Job(clash, dest)], ImportMode.Copy, null, default);
+            new Importer { RetryDelays = Fast }.Run([Job(ok, dest), Job(locked, dest), Job(clash, dest)], ImportMode.Copy, null, default);
 
         Assert.Equal(before.Files, Snapshot.Take(Path.Combine(dir.Path, "src")).Files);
         Assert.Equal("existing", File.ReadAllText(Path.Combine(dest, "clash.jpg")));
