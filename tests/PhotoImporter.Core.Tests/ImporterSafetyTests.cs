@@ -146,6 +146,36 @@ public class ImporterSafetyTests
         Assert.Equal("ok", File.ReadAllText(Assert.Single(result.Imported).DestinationPath));
     }
 
+    [Theory]
+    [InlineData(ImportMode.Move, false)] // atomic rename
+    [InlineData(ImportMode.Move, true)]  // temp file → final name
+    [InlineData(ImportMode.Copy, false)]
+    public void FileAppearingAtTheChosenNameIsNotOverwritten(ImportMode mode, bool crossVolume)
+    {
+        using var dir = new TempDir();
+        var src = dir.File(@"src\IMG.JPG", "mine");
+        var dest = Path.Combine(dir.Path, "dst");
+        var raced = false;
+        var importer = new Importer
+        {
+            TreatAsDifferentVolumes = crossVolume,
+            // Another program creates a file with the same name between our existence check and the rename.
+            BeforePlace = candidate =>
+            {
+                if (raced) return;
+                raced = true;
+                File.WriteAllText(candidate, "someone else's");
+            },
+        };
+
+        var result = importer.Run([Job(src, dest)], mode, null, default);
+
+        Assert.Empty(result.Failures);
+        Assert.Equal("someone else's", File.ReadAllText(Path.Combine(dest, "IMG.JPG")));
+        Assert.Equal("mine", File.ReadAllText(Path.Combine(dest, "IMG_1.JPG")));
+        Invariants.NoTempFiles(dest);
+    }
+
     [Fact]
     public void CopyModeNeverDeletesAnything()
     {

@@ -38,6 +38,9 @@ public sealed class Importer
     /// <summary>Test hook: called with the temp file path after copying, before verification.</summary>
     internal Action<string>? AfterTempWritten { get; init; }
 
+    /// <summary>Test hook: called after a free name was found and right before the file is placed there (race window).</summary>
+    internal Action<string>? BeforePlace { get; init; }
+
     public ImportResult Run(
         IReadOnlyList<ImportJob> jobs,
         ImportMode mode,
@@ -131,7 +134,7 @@ public sealed class Importer
         string.Equals(Path.GetFullPath(a), Path.GetFullPath(b), StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Rename within the same volume; tries name, name_1, name_2… without overwriting.</summary>
-    private static string MoveSameVolume(ImportJob job)
+    private string MoveSameVolume(ImportJob job)
     {
         var fileName = Path.GetFileName(job.SourcePath);
         return PlaceWithSuffix(fileName, job.DestinationFolder, candidate => File.Move(job.SourcePath, candidate, overwrite: false));
@@ -212,7 +215,7 @@ public sealed class Importer
     /// Calls <paramref name="place"/> with name, name_1, name_2… until it succeeds.
     /// <paramref name="place"/> must fail (IOException) when the destination already exists.
     /// </summary>
-    private static string PlaceWithSuffix(string fileName, string folder, Action<string> place)
+    private string PlaceWithSuffix(string fileName, string folder, Action<string> place)
     {
         for (var n = 0; n < MaxSuffix; n++)
         {
@@ -220,6 +223,7 @@ public sealed class Importer
             if (File.Exists(candidate) || Directory.Exists(candidate)) continue;
             try
             {
+                BeforePlace?.Invoke(candidate);
                 place(candidate);
                 return candidate;
             }
