@@ -327,7 +327,7 @@
             <Button AutomationProperties.AutomationId="CancelImport" DockPanel.Dock="Right" Content="Отмена" Padding="16,6" Margin="12,0,0,0" Command="{Binding CancelImportCommand}"
                     Visibility="{Binding IsImporting, Converter={StaticResource BoolToVis}}"/>
             <StackPanel VerticalAlignment="Center" Margin="32,0,0,0" Visibility="{Binding IsImporting, Converter={StaticResource BoolToVis}}">
-                <TextBlock Text="{Binding ImportStatus}" Style="{StaticResource Secondary}" Margin="0,0,0,4"/>
+                <TextBlock AutomationProperties.AutomationId="ImportStatus" Text="{Binding ImportStatus}" Style="{StaticResource Secondary}" Margin="0,0,0,4"/>
                 <ProgressBar Value="{Binding ImportProgress, Mode=OneWay}" Maximum="1" Height="4"/>
             </StackPanel>
         </DockPanel>

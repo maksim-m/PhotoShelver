@@ -21,6 +21,18 @@ public sealed class UiFact : FactAttribute
     }
 }
 
+/// <summary>UI test on a read-only volume with the fixtures in "&lt;root&gt;\card" (tools/run_real_volume_tests.ps1).</summary>
+public sealed class ReadOnlyCardUiFact : FactAttribute
+{
+    public ReadOnlyCardUiFact()
+    {
+        if (Environment.GetEnvironmentVariable("PHOTOIMPORTER_UI_TESTS") != "1")
+            Skip = "UI tests are opt-in (PHOTOIMPORTER_UI_TESTS=1)";
+        else if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("PHOTOIMPORTER_TEST_READONLY_VOLUME")))
+            Skip = "needs a read-only volume: run tools/run_real_volume_tests.ps1";
+    }
+}
+
 /// <summary>Settings written for the app under test (same shape as the app's settings.json).</summary>
 public sealed record UiSettings(
     string SourcePath,
@@ -137,6 +149,9 @@ public sealed class AppSession : IDisposable
     public static void Select(AutomationElement element) =>
         ((SelectionItemPattern)element.GetCurrentPattern(SelectionItemPattern.Pattern)).Select();
 
+    public static bool IsSelected(AutomationElement element) =>
+        ((SelectionItemPattern)element.GetCurrentPattern(SelectionItemPattern.Pattern)).Current.IsSelected;
+
     public void SetTemplate(string text) =>
         ((ValuePattern)Find("Template").GetCurrentPattern(ValuePattern.Pattern)).SetValue(text);
 
@@ -158,8 +173,22 @@ public sealed class AppSession : IDisposable
     /// <summary>Clicks Import, waits for the summary dialog, reads it and closes it.</summary>
     public ImportDialog RunImport()
     {
+        StartImport();
+        return WaitForImportDialog();
+    }
+
+    public void StartImport()
+    {
         Assert.True(ImportEnabled, "Import button is disabled. " + Diagnostics());
         Click("Import");
+    }
+
+    /// <summary>Asks the window to close (like the X button) without waiting.</summary>
+    public void RequestClose() => _process.CloseMainWindow();
+
+    /// <summary>Waits for the import summary dialog, reads it and closes it.</summary>
+    public ImportDialog WaitForImportDialog()
+    {
         AutomationElement? dialog = null;
         WaitUntil(() => (dialog = Window.FindFirst(TreeScope.Children, new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Window))) is not null
                         && TryFind("SummaryHeadline", dialog) is not null, "import summary dialog", TimeSpan.FromSeconds(120));

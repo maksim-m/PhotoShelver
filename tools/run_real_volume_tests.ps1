@@ -2,6 +2,8 @@
 Runs the RealVolume tests on two temporary exFAT virtual disks (like SD cards):
   - a writable one (copy to/from a different volume, unbuffered reads on exFAT, volume detection);
   - a read-only one with the fixtures on it (a write-protected card: move must keep every source).
+Then the UI test for a write-protected card runs in the real window (the app offers "copy instead").
+UI windows appear for a few seconds - do not touch them.
 The disks are always detached and their files deleted at the end.
 
 Safety: only two new files are created, in %TEMP%\PhotoImporterRealVolume. Every disk operation
@@ -29,6 +31,8 @@ if (-not $Elevated) {
     Remove-Item $Log, $TestOut -ErrorAction SilentlyContinue
     # Build as the current user so the elevated run does not create admin-owned files in the repo.
     & $Dotnet build (Join-Path $Repo "tests\PhotoImporter.Core.Tests") -nologo -v q
+    if ($LASTEXITCODE -ne 0) { throw "build failed" }
+    & $Dotnet build (Join-Path $Repo "tests\PhotoImporter.UiTests") -nologo -v q
     if ($LASTEXITCODE -ne 0) { throw "build failed" }
     Start-Process powershell.exe -Verb RunAs -Wait -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$PSCommandPath`"", '-Elevated')
     Get-Content $Log | Where-Object { $_ -match '^\d\d:\d\d' }
@@ -98,6 +102,10 @@ try {
     $env:PHOTOIMPORTER_TEST_READONLY_VOLUME = "${Y}:\"
     cmd /c "`"$Dotnet`" test `"$Repo\tests\PhotoImporter.Core.Tests`" --filter Category=RealVolume --no-build -nologo --logger `"console;verbosity=detailed`" > `"$TestOut`" 2>&1"
     Log "tests finished, exit code $LASTEXITCODE"
+
+    $env:PHOTOIMPORTER_UI_TESTS = "1"
+    cmd /c "`"$Dotnet`" test `"$Repo\tests\PhotoImporter.UiTests`" --filter Category=RealVolumeUi --no-build -nologo --logger `"console;verbosity=detailed`" >> `"$TestOut`" 2>&1"
+    Log "UI tests finished, exit code $LASTEXITCODE"
 }
 catch { Log ("ERROR: " + $_) }
 finally {

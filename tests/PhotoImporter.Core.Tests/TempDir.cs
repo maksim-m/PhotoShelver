@@ -28,15 +28,19 @@ internal sealed class TempDir : IDisposable
 
     public void Dispose()
     {
-        try
+        // A process that has just exited (the app in UI tests) can hold the folder for a moment: retry briefly.
+        for (var attempt = 0; attempt < 5 && Directory.Exists(Path); attempt++)
         {
-            foreach (var f in Directory.EnumerateFiles(Path, "*", SearchOption.AllDirectories))
-                System.IO.File.SetAttributes(f, FileAttributes.Normal);
-            Directory.Delete(Path, recursive: true);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            // Leftovers in %TEMP% are harmless.
+            try
+            {
+                foreach (var f in Directory.EnumerateFiles(Path, "*", SearchOption.AllDirectories))
+                    System.IO.File.SetAttributes(f, FileAttributes.Normal);
+                Directory.Delete(Path, recursive: true);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                Thread.Sleep(200); // leftovers in %TEMP% would be harmless anyway
+            }
         }
     }
 }
