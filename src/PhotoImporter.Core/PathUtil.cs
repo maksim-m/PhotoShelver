@@ -13,8 +13,37 @@ public static class PathUtil
         return na.StartsWith(nb, StringComparison.OrdinalIgnoreCase) || nb.StartsWith(na, StringComparison.OrdinalIgnoreCase);
     }
 
-    public static bool IsSameVolume(string a, string b) =>
-        string.Equals(Path.GetPathRoot(Path.GetFullPath(a)), Path.GetPathRoot(Path.GetFullPath(b)), StringComparison.OrdinalIgnoreCase);
+    /// <summary>
+    /// True when both paths are on the same volume (so a move is an atomic rename).
+    /// Uses the volume mount point, so a disk mounted into a folder (C:\Mount\Disk2) counts as a different volume.
+    /// When in doubt returns false: the caller then copies and verifies, which is always safe.
+    /// </summary>
+    public static bool IsSameVolume(string a, string b)
+    {
+        var va = VolumeOf(a);
+        var vb = VolumeOf(b);
+        return va is not null && vb is not null && string.Equals(va, vb, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string? VolumeOf(string path)
+    {
+        var full = Path.GetFullPath(path);
+        // GetVolumePathName needs an existing path: walk up to the nearest existing ancestor.
+        var existing = full;
+        while (!Directory.Exists(existing) && !File.Exists(existing))
+        {
+            existing = Path.GetDirectoryName(existing);
+            if (existing is null) return null;
+        }
+        var buffer = new char[32768];
+        return GetVolumePathNameW(existing, buffer, (uint)buffer.Length)
+            ? new string(buffer, 0, Array.IndexOf(buffer, '\0'))
+            : null;
+    }
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
+    [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+    private static extern bool GetVolumePathNameW(string fileName, [System.Runtime.InteropServices.Out] char[] volumePathName, uint bufferLength);
 
     /// <summary>"IMG_0001.JPG", 2 → "IMG_0001_2.JPG".</summary>
     public static string WithSuffix(string fileName, int n) =>

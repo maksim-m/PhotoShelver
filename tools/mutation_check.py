@@ -8,7 +8,7 @@ Usage (from anywhere):  python tools/mutation_check.py
 Exit code: 0 if every mutation was caught, 1 otherwise.
 
 When code changes so that a snippet below no longer exists, the script stops with an error -
-update the snippet together with the code.
+update the snippet together with the code. Snippets use "\n" line endings; files may use CRLF.
 """
 import io
 import os
@@ -31,8 +31,11 @@ MUTATIONS = [
     ("temp may overwrite on final rename", IMP,
      "candidate => File.Move(temp, candidate, overwrite: false)",
      "candidate => File.Move(temp, Path.Combine(job.DestinationFolder, fileName), overwrite: true)"),
-    ("hash verification disabled", IMP,
-     "if (copyHash != sourceHash)",
+    ("copy not verified from disk", IMP,
+     "if (FileHasher.HashFromDisk(temp) != copiedHash)",
+     "if (false)"),
+    ("source not re-read before placing", IMP,
+     "if (FileHasher.HashFromDisk(job.SourcePath) != copiedHash)",
      "if (false)"),
     ("source-changed check disabled", IMP,
      "if (source.Length != sizeBefore || source.LastWriteTimeUtc != writeTimeBefore)",
@@ -44,18 +47,35 @@ MUTATIONS = [
      "failures.Add(new ImportFailure(job.SourcePath, ex.Message));",
      "failures.Add(new ImportFailure(job.SourcePath, ex.Message)); try { File.Delete(job.SourcePath); } catch { }"),
     ("temp file not cleaned up", IMP,
-     "if (File.Exists(temp)) File.Delete(temp);",
-     ""),
+     "                    File.Delete(temp);\n",
+     "\n"),
+    ("temp deleted even if not ours", IMP,
+     "            if (ownsTemp)\n",
+     "            if (true)\n"),
     ("same-folder guard removed", IMP,
      "if (SamePath(source.DirectoryName!, job.DestinationFolder))",
      "if (false)"),
     ("duplicate = same size only", DUP,
      "if (existingHash == hash)",
      "if (true)"),
+    ("leftover .importing counted as imported", DUP,
+     'if (f.Name.EndsWith(".importing", StringComparison.OrdinalIgnoreCase)) continue;',
+     ""),
     ("metadata errors not caught", CDR,
      "catch (Exception ex) when (ex is not (OutOfMemoryException or StackOverflowException or AccessViolationException))",
      "catch (IOException)"),
 ]
+
+CRLF = "\r\n"
+LF = "\n"
+
+
+def read_raw(path):
+    return io.open(path, encoding="utf-8", newline="").read()
+
+
+def write_raw(path, text):
+    io.open(path, "w", encoding="utf-8", newline="").write(text)
 
 
 def find_dotnet():
@@ -79,9 +99,9 @@ def run_tests(dotnet):
 def main():
     dotnet = find_dotnet()
 
-    # Sanity: all snippets exist and the unmodified suite is green.
+    # Sanity: all snippets exist exactly once and the unmodified suite is green.
     for name, rel, old, _ in MUTATIONS:
-        text = io.open(os.path.join(REPO, rel), encoding="utf-8", newline="").read()
+        text = read_raw(os.path.join(REPO, rel)).replace(CRLF, LF)
         if text.count(old) != 1:
             sys.exit(f"Snippet for '{name}' found {text.count(old)}x in {rel} (expected exactly 1) - update this script")
     baseline = run_tests(dotnet)
@@ -92,12 +112,16 @@ def main():
     missed = []
     for name, rel, old, new in MUTATIONS:
         path = os.path.join(REPO, rel)
-        original = io.open(path, encoding="utf-8", newline="").read()
+        original = read_raw(path)
+        uses_crlf = CRLF in original
+        mutated = original.replace(CRLF, LF).replace(old, new, 1)
+        if uses_crlf:
+            mutated = mutated.replace(LF, CRLF)
         try:
-            io.open(path, "w", encoding="utf-8", newline="").write(original.replace(old, new, 1))
+            write_raw(path, mutated)
             result = run_tests(dotnet)
         finally:
-            io.open(path, "w", encoding="utf-8", newline="").write(original)  # always restore
+            write_raw(path, original)  # always restore, byte for byte
 
         if result is None:
             status, caught = "build failed", True

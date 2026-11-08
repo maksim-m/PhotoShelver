@@ -103,10 +103,9 @@ internal static class Pipeline
         var enumerated = SourceScanner.Enumerate(source, recursive: true);
         await SourceScanner.ReadMetadataAsync(enumerated.Files, new CaptureDateReader(Fixtures.Berlin), null, default);
         var duplicates = DuplicateDetector.Detect(enumerated.Files, target, tpl, new HashCache(), null, default);
-        var jobs = enumerated.Files
-            .Where(f => f.Error is null && f.Date is not null && duplicates[f].State == DuplicateState.New)
-            .Select(f => new ImportJob(f.Path, Path.Combine(target, tpl.Format(f.Date!.Value.Local)), f.Size))
-            .ToList();
+        // Same job planning as the app.
+        var jobs = ImportPlan.CreateJobs(
+            enumerated.Files.Where(f => f.Error is null && f.Date is not null && duplicates[f].State == DuplicateState.New), target, tpl);
         var result = (importer ?? new Importer()).Run(jobs, mode, null, default);
         return new Outcome(enumerated.Files, duplicates, jobs, result);
     }

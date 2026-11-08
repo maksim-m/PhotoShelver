@@ -94,6 +94,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     {
         ParseTemplate(value);
         if (_initializing) return;
+        // Duplicate marks belong to the old template: block the import until the new check has run.
+        _duplicatesChecked = false;
         ResetTreeView();
         _templateTimer.Stop();
         _templateTimer.Start();
@@ -253,10 +255,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         var target = TargetPath!;
         var template = _template!;
         var mode = IsMoveMode ? ImportMode.Move : ImportMode.Copy;
-        var jobs = _items
-            .Where(i => i.IsSelected && i.CanBeImported)
-            .Select(i => new ImportJob(i.File.Path, Path.Combine(target, template.Format(i.File.Date!.Value.Local)), i.File.Size))
-            .ToList();
+        var jobs = ImportPlan.CreateJobs(_items.Where(i => i.IsSelected && i.CanBeImported).Select(i => i.File), target, template);
         if (jobs.Count == 0) return;
 
         if (mode == ImportMode.Move && !PathUtil.IsWritable(jobs[0].SourcePath))

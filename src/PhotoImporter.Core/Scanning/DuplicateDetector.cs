@@ -133,6 +133,8 @@ public static class DuplicateDetector
         {
             foreach (var f in dir.EnumerateFiles("*", new EnumerationOptions { IgnoreInaccessible = true, AttributesToSkip = 0 }))
             {
+                // A leftover temp file of an interrupted import is not an imported file.
+                if (f.Name.EndsWith(".importing", StringComparison.OrdinalIgnoreCase)) continue;
                 if (!index.TryGetValue(f.Length, out var list)) index[f.Length] = list = [];
                 list.Add(f);
             }

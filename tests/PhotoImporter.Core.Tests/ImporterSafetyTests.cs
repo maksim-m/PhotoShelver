@@ -11,8 +11,10 @@ public class ImporterSafetyTests
 {
     private static ImportJob Job(string src, string destFolder) => new(src, destFolder, new FileInfo(src).Length);
 
-    [Fact]
-    public void CorruptedCopyIsDetected_SourceKept_NothingLeftBehind()
+    [Theory]
+    [InlineData(ImportMode.Copy)]
+    [InlineData(ImportMode.Move)]
+    public void CorruptedCopyIsDetected_SourceKept_NothingLeftBehind(ImportMode mode)
     {
         using var dir = new TempDir();
         var src = dir.File(@"src\IMG.JPG", "original bytes");
@@ -20,20 +22,49 @@ public class ImporterSafetyTests
         var importer = new Importer
         {
             TreatAsDifferentVolumes = true,
-            AfterTempWritten = temp => File.AppendAllText(temp, "bit rot"),
+            AfterTempWritten = temp => File.AppendAllText(temp, "bit rot"), // the copy on disk differs from what was read
         };
 
-        var result = importer.Run([Job(src, dest)], ImportMode.Move, null, default);
+        var result = importer.Run([Job(src, dest)], mode, null, default);
 
         Assert.Empty(result.Imported);
-        Assert.Contains("хеш", Assert.Single(result.Failures).Message);
+        Assert.Contains("ошибка записи", Assert.Single(result.Failures).Message);
         Assert.Equal("original bytes", File.ReadAllText(src));
         Assert.Empty(Directory.GetFiles(dest));
     }
 
     [Theory]
-    [InlineData(true)]  // content appended
-    [InlineData(false)] // only the timestamp changed
+    [InlineData(ImportMode.Copy)]
+    [InlineData(ImportMode.Move)]
+    public void SourceReadingDifferentlyOnRereadIsDetected(ImportMode mode)
+    {
+        // Simulates a flaky card reader: the data read during the copy differs from what the card holds
+        // (same size, same timestamp - only a re-read from the device can notice).
+        using var dir = new TempDir();
+        var mtime = new DateTime(2024, 5, 5, 0, 0, 0, DateTimeKind.Utc);
+        var src = dir.File(@"src\IMG.JPG", "AAAAAAAA", mtime);
+        var dest = Path.Combine(dir.Path, "dst");
+        var importer = new Importer
+        {
+            TreatAsDifferentVolumes = true,
+            AfterTempWritten = _ =>
+            {
+                File.WriteAllText(src, "AAAABAAA");
+                File.SetLastWriteTimeUtc(src, mtime);
+            },
+        };
+
+        var result = importer.Run([Job(src, dest)], mode, null, default);
+
+        Assert.Empty(result.Imported);
+        Assert.Contains("повторном чтении", Assert.Single(result.Failures).Message);
+        Assert.True(File.Exists(src));
+        Assert.Empty(Directory.GetFiles(dest));
+    }
+
+    [Theory]
+    [InlineData(true)]  // content appended → caught by the re-read, nothing is placed
+    [InlineData(false)] // only the timestamp changed → copy placed, but the source is not deleted
     public void SourceChangedDuringCopyIsNotDeleted(bool changeContent)
     {
         using var dir = new TempDir();
@@ -51,10 +82,60 @@ public class ImporterSafetyTests
 
         var result = importer.Run([Job(src, dest)], ImportMode.Move, null, default);
 
-        Assert.Single(result.Imported);
-        Assert.Contains("изменился", Assert.Single(result.Failures).Message);
         Assert.True(File.Exists(src));
-        Assert.Equal("frame-1", File.ReadAllText(Path.Combine(dest, "VID.MP4")));
+        Invariants.NoTempFiles(dest);
+        if (changeContent)
+        {
+            Assert.Empty(result.Imported);
+            Assert.Empty(Directory.GetFiles(dest));
+        }
+        else
+        {
+            Assert.Single(result.Imported);
+            Assert.Contains("изменился", Assert.Single(result.Failures).Message);
+            Assert.Equal("frame-1", File.ReadAllText(Path.Combine(dest, "VID.MP4")));
+        }
+    }
+
+    [Theory]
+    [InlineData(ImportMode.Copy, false)]
+    [InlineData(ImportMode.Move, true)]
+    public void FailureInTheMiddleOfCopyingLeavesNothingBehind(ImportMode mode, bool crossVolume)
+    {
+        // Disk full, card pulled out, network share gone…
+        using var dir = new TempDir();
+        var src = dir.File(@"src\VID.MP4", new string('v', 3_500_000));
+        var dest = Path.Combine(dir.Path, "dst");
+        dir.File(@"dst\existing.jpg", "keep me");
+        var importer = new Importer
+        {
+            TreatAsDifferentVolumes = crossVolume,
+            DuringCopy = written => { if (written > 1_000_000) throw new IOException("There is not enough space on the disk."); },
+        };
+
+        var result = importer.Run([Job(src, dest)], mode, null, default);
+
+        Assert.Empty(result.Imported);
+        Assert.Contains("space", Assert.Single(result.Failures).Message);
+        Assert.Equal(3_500_000, new FileInfo(src).Length);
+        Assert.Equal(["existing.jpg"], Directory.GetFiles(dest).Select(Path.GetFileName));
+        Assert.Equal("keep me", File.ReadAllText(Path.Combine(dest, "existing.jpg")));
+    }
+
+    [Fact]
+    public void ForeignFileWithTheTempNameIsNeverDeleted()
+    {
+        using var dir = new TempDir();
+        var src = dir.File(@"src\IMG.JPG", "mine");
+        var dest = Path.Combine(dir.Path, "dst");
+        var foreign = dir.File(@"dst\IMG.JPG.fixed.importing", "not ours");
+        var importer = new Importer { TempFileName = name => name + ".fixed.importing" };
+
+        var result = importer.Run([Job(src, dest)], ImportMode.Copy, null, default);
+
+        Assert.Single(result.Failures); // CreateNew refused to touch the existing file
+        Assert.Equal("not ours", File.ReadAllText(foreign));
+        Assert.Equal("mine", File.ReadAllText(src));
     }
 
     [Theory]
@@ -251,8 +332,19 @@ public class ImporterSafetyTests
         Assert.Empty(result.Failures);
         Assert.Equal(jobs.Count, result.Imported.Count);
         Assert.Equal(jobs.Count, result.Imported.Select(i => i.DestinationPath.ToUpperInvariant()).Distinct().Count());
+        var jobBySource = jobs.ToDictionary(j => j.SourcePath);
         foreach (var imported in result.Imported)
+        {
+            // Right content…
             Assert.Equal(sourceHashes[imported.SourcePath], FileHasher.Hash(imported.DestinationPath));
+            // …in the right folder…
+            Assert.Equal(jobBySource[imported.SourcePath].DestinationFolder, Path.GetDirectoryName(imported.DestinationPath), StringComparer.OrdinalIgnoreCase);
+            // …under the original name or the original name with a _N suffix.
+            var original = Path.GetFileNameWithoutExtension(imported.SourcePath);
+            var placed = Path.GetFileNameWithoutExtension(imported.DestinationPath);
+            Assert.Matches("^" + System.Text.RegularExpressions.Regex.Escape(original) + "(_[0-9]+)?$", placed);
+            Assert.Equal(Path.GetExtension(imported.SourcePath), Path.GetExtension(imported.DestinationPath));
+        }
         Assert.All(jobs, j => Assert.Equal(mode == ImportMode.Copy, File.Exists(j.SourcePath)));
 
         var srcAfter = Snapshot.Take(srcRoot);

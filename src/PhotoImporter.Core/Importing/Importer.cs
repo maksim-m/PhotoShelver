@@ -41,6 +41,12 @@ public sealed class Importer
     /// <summary>Test hook: called after a free name was found and right before the file is placed there (race window).</summary>
     internal Action<string>? BeforePlace { get; init; }
 
+    /// <summary>Test hook: called after each chunk is written (throw to simulate a full disk or a removed card).</summary>
+    internal Action<long>? DuringCopy { get; init; }
+
+    /// <summary>Test hook: overrides the temp file name (file name → temp name).</summary>
+    internal Func<string, string>? TempFileName { get; init; }
+
     public ImportResult Run(
         IReadOnlyList<ImportJob> jobs,
         ImportMode mode,
@@ -106,7 +112,7 @@ public sealed class Importer
             return;
         }
 
-        var dest = CopyViaTemp(job, verify: mode == ImportMode.Move, onBytes);
+        var dest = CopyViaTemp(job, onBytes);
         imported.Add(new ImportedFile(job.SourcePath, dest));
         if (mode != ImportMode.Move) return;
 
@@ -140,22 +146,25 @@ public sealed class Importer
         return PlaceWithSuffix(fileName, job.DestinationFolder, candidate => File.Move(job.SourcePath, candidate, overwrite: false));
     }
 
-    /// <summary>Copies to a temporary *.importing file, optionally verifies the hash, then renames to a free name.</summary>
-    private string CopyViaTemp(ImportJob job, bool verify, Action<long> onBytes)
+    /// <summary>
+    /// Copies to a temporary *.importing file, verifies it, then renames it to a free name.
+    /// Verification (both modes): the copy is read back from disk bypassing the cache, and the source is
+    /// re-read from its device; both must match the data that was copied. On any mismatch nothing is placed.
+    /// </summary>
+    private string CopyViaTemp(ImportJob job, Action<long> onBytes)
     {
         var fileName = Path.GetFileName(job.SourcePath);
-        var temp = Path.Combine(job.DestinationFolder, $"{fileName}.{Guid.NewGuid():N}.importing");
+        var temp = Path.Combine(job.DestinationFolder, TempFileName?.Invoke(fileName) ?? $"{fileName}.{Guid.NewGuid():N}.importing");
+        var ownsTemp = false; // only ever delete a temp file this call created
         try
         {
-            var sourceHash = CopyAndHash(job.SourcePath, temp, onBytes);
+            var copiedHash = CopyAndHash(job.SourcePath, temp, onBytes, () => ownsTemp = true);
             AfterTempWritten?.Invoke(temp);
 
-            if (verify)
-            {
-                var copyHash = FileHasher.Hash(temp);
-                if (copyHash != sourceHash)
-                    throw new InvalidDataException("Копия не совпадает с исходным файлом (ошибка проверки хеша)");
-            }
+            if (FileHasher.HashFromDisk(temp) != copiedHash)
+                throw new InvalidDataException("Копия на диске не совпадает с прочитанными данными (ошибка записи). Файл не импортирован");
+            if (FileHasher.HashFromDisk(job.SourcePath) != copiedHash)
+                throw new InvalidDataException("Исходный файл при повторном чтении отличается от скопированного (нестабильное чтение или файл изменился). Файл не импортирован");
 
             var src = new FileInfo(job.SourcePath);
             try
@@ -168,22 +177,27 @@ public sealed class Importer
                 // Timestamps are nice to have; some file systems reject them.
             }
 
-            return PlaceWithSuffix(fileName, job.DestinationFolder, candidate => File.Move(temp, candidate, overwrite: false));
+            var placed = PlaceWithSuffix(fileName, job.DestinationFolder, candidate => File.Move(temp, candidate, overwrite: false));
+            ownsTemp = false; // it has become the imported file
+            return placed;
         }
         finally
         {
-            try
+            if (ownsTemp)
             {
-                if (File.Exists(temp)) File.Delete(temp);
-            }
-            catch (Exception ex) when (!IsFatal(ex))
-            {
-                // Best effort cleanup.
+                try
+                {
+                    File.Delete(temp);
+                }
+                catch (Exception ex) when (!IsFatal(ex))
+                {
+                    // Best effort cleanup; a leftover *.importing file is ignored by the duplicate check.
+                }
             }
         }
     }
 
-    private static UInt128 CopyAndHash(string source, string destination, Action<long> onBytes)
+    private UInt128 CopyAndHash(string source, string destination, Action<long> onBytes, Action created)
     {
         var hasher = new XxHash128();
         var buffer = ArrayPool<byte>.Shared.Rent(FileHasher.BufferSize);
@@ -191,6 +205,7 @@ public sealed class Importer
         {
             using var input = new FileStream(source, FileMode.Open, FileAccess.Read, FileShare.Read, 1, FileOptions.SequentialScan);
             using var output = new FileStream(destination, FileMode.CreateNew, FileAccess.Write, FileShare.None, 1, FileOptions.SequentialScan);
+            created();
             output.SetLength(input.Length);
             long total = 0;
             int read;
@@ -199,6 +214,7 @@ public sealed class Importer
                 hasher.Append(buffer.AsSpan(0, read));
                 output.Write(buffer, 0, read);
                 total += read;
+                DuringCopy?.Invoke(total);
                 onBytes(total);
             }
             output.SetLength(total);
