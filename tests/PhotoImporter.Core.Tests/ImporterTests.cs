@@ -64,6 +64,40 @@ public class ImporterTests
     }
 
     [Fact]
+    public void CrossVolumeMoveCopiesVerifiesAndDeletesSource()
+    {
+        using var dir = new TempDir();
+        var mtime = new DateTime(2021, 1, 2, 3, 4, 5, DateTimeKind.Utc);
+        var src = dir.File(@"src\VID.MP4", new string('x', 3_000_000), mtime);
+        var dest = System.IO.Path.Combine(dir.Path, "dst");
+
+        var result = new Importer { TreatAsDifferentVolumes = true }.Run([Job(src, dest)], ImportMode.Move, null, default);
+
+        Assert.Empty(result.Failures);
+        var target = System.IO.Path.Combine(dest, "VID.MP4");
+        Assert.Equal(3_000_000, new FileInfo(target).Length);
+        Assert.Equal(mtime, File.GetLastWriteTimeUtc(target));
+        Assert.False(File.Exists(src));
+        Assert.Empty(Directory.GetFiles(dest, "*.importing"));
+    }
+
+    [Fact]
+    public void CrossVolumeMoveKeepsSourceWhenItCannotBeDeleted()
+    {
+        using var dir = new TempDir();
+        var src = dir.File(@"src\IMG.JPG", "data");
+        var dest = System.IO.Path.Combine(dir.Path, "dst");
+        using var lockHandle = new FileStream(src, FileMode.Open, FileAccess.Read, FileShare.Read); // blocks deletion
+
+        var result = new Importer { TreatAsDifferentVolumes = true }.Run([Job(src, dest)], ImportMode.Move, null, default);
+
+        Assert.Single(result.Imported);
+        Assert.Contains("не удалён", Assert.Single(result.Failures).Message);
+        Assert.True(File.Exists(src));
+        Assert.Equal("data", File.ReadAllText(System.IO.Path.Combine(dest, "IMG.JPG")));
+    }
+
+    [Fact]
     public void MissingSourceIsReportedAndOthersContinue()
     {
         using var dir = new TempDir();

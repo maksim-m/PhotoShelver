@@ -32,6 +32,9 @@ public sealed class Importer
     private const int MaxSuffix = 100_000;
     private static readonly TimeSpan ProgressInterval = TimeSpan.FromMilliseconds(100);
 
+    /// <summary>Test hook: handle moves as cross-volume (copy + verify + delete).</summary>
+    internal bool TreatAsDifferentVolumes { get; init; }
+
     public ImportResult Run(
         IReadOnlyList<ImportJob> jobs,
         ImportMode mode,
@@ -63,7 +66,7 @@ public sealed class Importer
             try
             {
                 Directory.CreateDirectory(job.DestinationFolder);
-                var dest = mode == ImportMode.Move && PathUtil.IsSameVolume(job.SourcePath, job.DestinationFolder)
+                var dest = mode == ImportMode.Move && !TreatAsDifferentVolumes && PathUtil.IsSameVolume(job.SourcePath, job.DestinationFolder)
                     ? MoveSameVolume(job)
                     : CopyViaTemp(job, verify: mode == ImportMode.Move, b => Report(i, startBytes + b, job.SourcePath));
 
