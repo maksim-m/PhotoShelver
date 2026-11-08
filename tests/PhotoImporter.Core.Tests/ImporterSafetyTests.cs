@@ -204,10 +204,41 @@ public class ImporterSafetyTests
         var result = new Importer { TreatAsDifferentVolumes = true }.Run([Job(src, dest)], ImportMode.Move, null, default);
 
         Assert.Single(result.Imported);
-        Assert.Single(result.Failures);
+        Assert.Contains("защищён", Assert.Single(result.Failures).Message);
         Assert.True(File.Exists(src));
-        Assert.Equal("data", File.ReadAllText(Path.Combine(dest, "IMG.JPG")));
+        Assert.True(File.GetAttributes(src).HasFlag(FileAttributes.ReadOnly)); // the camera protection is not removed
+        var copy = Path.Combine(dest, "IMG.JPG");
+        Assert.Equal("data", File.ReadAllText(copy));
+        Assert.False(File.GetAttributes(copy).HasFlag(FileAttributes.ReadOnly)); // the library copy is a normal file
         File.SetAttributes(src, FileAttributes.Normal);
+    }
+
+    [Theory]
+    [InlineData(ImportMode.Copy, false)]
+    [InlineData(ImportMode.Move, false)] // same-volume rename keeps attributes: the importer must clear it
+    public void ProtectedFileLandsInTheLibraryWritable(ImportMode mode, bool crossVolume)
+    {
+        using var dir = new TempDir();
+        var src = dir.File(@"src\IMG.JPG", "data");
+        File.SetAttributes(src, FileAttributes.ReadOnly | FileAttributes.Archive);
+        var dest = Path.Combine(dir.Path, "dst");
+
+        var result = new Importer { TreatAsDifferentVolumes = crossVolume }.Run([Job(src, dest)], mode, null, default);
+
+        Assert.Empty(result.Failures);
+        Assert.Empty(result.Warnings);
+        var placed = Path.Combine(dest, "IMG.JPG");
+        Assert.Equal("data", File.ReadAllText(placed));
+        Assert.False(File.GetAttributes(placed).HasFlag(FileAttributes.ReadOnly));
+        if (mode == ImportMode.Copy)
+        {
+            Assert.True(File.GetAttributes(src).HasFlag(FileAttributes.ReadOnly)); // source untouched
+            File.SetAttributes(src, FileAttributes.Normal);
+        }
+        else
+        {
+            Assert.False(File.Exists(src));
+        }
     }
 
     [Fact]

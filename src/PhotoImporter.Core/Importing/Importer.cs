@@ -65,6 +65,7 @@ public sealed class Importer
         var imported = new List<ImportedFile>();
         var failures = new List<ImportFailure>();
         var cachedVolumes = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+        var warnings = new List<string>();
         var bytesTotal = jobs.Sum(j => j.Size);
         long bytesDone = 0;
         var clock = Stopwatch.StartNew();
@@ -77,7 +78,7 @@ public sealed class Importer
             progress?.Report(new ImportProgress(filesDone, jobs.Count, bytes, bytesTotal, current));
         }
 
-        ImportResult Result(bool cancelled) => new(imported, failures, cancelled, Warnings(cachedVolumes));
+        ImportResult Result(bool cancelled) => new(imported, failures, cancelled, [.. Warnings(cachedVolumes), .. warnings]);
 
         for (var i = 0; i < jobs.Count; i++)
         {
@@ -89,7 +90,7 @@ public sealed class Importer
             Report(i, bytesDone, job.SourcePath, force: true);
             try
             {
-                ImportOne(job, mode, b => Report(i, startBytes + b, job.SourcePath), imported, failures, cachedVolumes);
+                ImportOne(job, mode, b => Report(i, startBytes + b, job.SourcePath), imported, failures, cachedVolumes, warnings);
             }
             catch (Exception ex) when (!IsFatal(ex))
             {
@@ -109,7 +110,7 @@ public sealed class Importer
             .ToList();
 
     private void ImportOne(ImportJob job, ImportMode mode, Action<long> onBytes,
-        List<ImportedFile> imported, List<ImportFailure> failures, ISet<string> cachedVolumes)
+        List<ImportedFile> imported, List<ImportFailure> failures, ISet<string> cachedVolumes, List<string> warnings)
     {
         var source = new FileInfo(job.SourcePath);
         if (!source.Exists)
@@ -126,7 +127,10 @@ public sealed class Importer
         if (mode == ImportMode.Move && !TreatAsDifferentVolumes && PathUtil.IsSameVolume(job.SourcePath, job.DestinationFolder))
         {
             // Atomic rename: the file is either still at the source or already at the destination.
-            imported.Add(new ImportedFile(job.SourcePath, MoveSameVolume(job)));
+            var moved = MoveSameVolume(job);
+            imported.Add(new ImportedFile(job.SourcePath, moved));
+            // A renamed file keeps its attributes; files in the library are always writable (copies are created writable).
+            ClearReadOnly(moved, warnings);
             return;
         }
 
@@ -137,6 +141,12 @@ public sealed class Importer
         // Cross-volume move: delete the source only if it is exactly what was copied and verified.
         source.Refresh();
         if (!source.Exists) return;
+        if (source.Attributes.HasFlag(FileAttributes.ReadOnly))
+        {
+            // Protected in the camera (or by the user): never remove that protection to delete the original.
+            failures.Add(new ImportFailure(job.SourcePath, $"Скопирован в «{dest}»; исходный файл защищён (атрибут «только чтение», например защита в камере) и не удалён"));
+            return;
+        }
         if (!sourceReadFromDevice)
         {
             failures.Add(new ImportFailure(job.SourcePath, $"Скопирован в «{dest}», но исходный файл не удалён: носитель не позволяет надёжно перечитать его для проверки"));
@@ -154,6 +164,20 @@ public sealed class Importer
         catch (Exception ex) when (!IsFatal(ex))
         {
             failures.Add(new ImportFailure(job.SourcePath, $"Скопирован в «{dest}», но исходный файл не удалён: {ex.Message}"));
+        }
+    }
+
+    private static void ClearReadOnly(string path, List<string> warnings)
+    {
+        try
+        {
+            var attributes = File.GetAttributes(path);
+            if (attributes.HasFlag(FileAttributes.ReadOnly))
+                File.SetAttributes(path, attributes & ~FileAttributes.ReadOnly);
+        }
+        catch (Exception ex) when (!IsFatal(ex))
+        {
+            warnings.Add($"Не удалось снять атрибут «только чтение» с «{path}»: {ex.Message}");
         }
     }
 

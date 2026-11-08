@@ -318,9 +318,10 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         var jobs = ImportPlan.CreateJobs(_items.Where(i => i.IsSelected && i.CanBeImported).Select(i => i.File), target, template);
         if (jobs.Count == 0) return;
 
-        if (mode == ImportMode.Move && !PathUtil.IsWritable(jobs[0].SourcePath))
+        // Only a whole write-protected volume blocks a move; single protected files are copied and kept (see Importer).
+        if (mode == ImportMode.Move && PathUtil.IsReadOnlyVolume(jobs[0].SourcePath))
         {
-            Notice = "Источник защищён от записи (например, заблокированная карта памяти) — файлы нельзя переместить.";
+            Notice = "Носитель-источник защищён от записи (например, переключатель на карте памяти) — файлы нельзя переместить.";
             NoticeHasAction = true;
             return;
         }
