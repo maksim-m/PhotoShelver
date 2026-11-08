@@ -72,7 +72,12 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         set => IsMoveMode = !value;
     }
 
-    partial void OnSourcePathChanged(string? value) { if (!_initializing) StartScan(); }
+    partial void OnSourcePathChanged(string? value)
+    {
+        if (_initializing) return;
+        _collapsedDays.Clear();
+        StartScan();
+    }
 
     partial void OnIncludeSubfoldersChanged(bool value) { if (!_initializing) StartScan(); }
 
@@ -385,6 +390,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _items = [];
         _skippedOther = 0;
         Rows.Clear();
+        HasGroups = false;
         ScheduleRefresh();
     }
 
@@ -447,10 +453,62 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         foreach (var group in _items.GroupBy(i => i.CanBeImported ? i.File.Date!.Value.Local.Date : (DateTime?)null))
         {
             var list = group.ToList();
-            Rows.Add(new HeaderRow(group.Key is { } d ? Format.Date(d) : "Не удалось прочитать", Format.Files(list.Count)));
-            for (var i = 0; i < list.Count; i += _columns)
-                Rows.Add(new TileRow(list.GetRange(i, Math.Min(_columns, list.Count - i))));
+            var collapsed = _collapsedDays.Contains(group.Key);
+            var header = new HeaderRow(group.Key, group.Key is { } d ? Format.Date(d) : "Не удалось прочитать", list, collapsed);
+            Rows.Add(header);
+            if (!collapsed)
+                foreach (var row in TileRowsOf(header)) Rows.Add(row);
         }
+        HasGroups = Rows.Count > 0;
+    }
+
+    private IEnumerable<TileRow> TileRowsOf(HeaderRow header)
+    {
+        for (var i = 0; i < header.Items.Count; i += _columns)
+            yield return new TileRow(header.Items.Skip(i).Take(_columns).ToList());
+    }
+
+    /// <summary>Days collapsed by the user; kept across rescans of the same source, reset when the source changes.</summary>
+    private readonly HashSet<DateTime?> _collapsedDays = [];
+
+    [ObservableProperty] private bool _hasGroups;
+
+    // Parameter is object on purpose: recycled row containers can briefly bind a TileRow here,
+    // and a typed RelayCommand<HeaderRow> would throw from CanExecute.
+    [RelayCommand]
+    private void ToggleGroup(object? parameter)
+    {
+        if (parameter is not HeaderRow header) return;
+        var index = Rows.IndexOf(header);
+        if (index < 0) return;
+
+        if (header.IsCollapsed)
+        {
+            // Insert in place instead of rebuilding, so the scroll position stays put.
+            var at = index + 1;
+            foreach (var row in TileRowsOf(header)) Rows.Insert(at++, row);
+            _collapsedDays.Remove(header.Day);
+        }
+        else
+        {
+            while (index + 1 < Rows.Count && Rows[index + 1] is TileRow) Rows.RemoveAt(index + 1);
+            _collapsedDays.Add(header.Day);
+        }
+        header.IsCollapsed = !header.IsCollapsed;
+    }
+
+    [RelayCommand]
+    private void CollapseAll()
+    {
+        foreach (var header in Rows.OfType<HeaderRow>()) _collapsedDays.Add(header.Day);
+        RebuildRows();
+    }
+
+    [RelayCommand]
+    private void ExpandAll()
+    {
+        _collapsedDays.Clear();
+        RebuildRows();
     }
 
     // ---------- Counters, tree, state ----------
@@ -481,13 +539,14 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             if (inSource > 0) parts.Add($"Дубликатов в источнике {inSource}");
             if (errors > 0) parts.Add($"Ошибок {errors}");
             parts.Add($"Выбрано {selected.Count} ({Format.Bytes(selected.Sum(i => i.File.Size))})");
-            SummaryText = string.Join(" · ", parts.Select(p => p.Replace(' ', ' ')));
+            SummaryText = string.Join(" · ", parts.Select(p => p.Replace(' ', '\u00A0')));
         }
         else
         {
             SummaryText = "";
         }
         SkippedText = _skippedOther > 0 ? $"Пропущено {Format.Files(_skippedOther)} других типов" : null;
+        foreach (var header in Rows.OfType<HeaderRow>()) header.RefreshCounts();
 
         UpdateState();
         _ = RefreshTreeAsync(selected);

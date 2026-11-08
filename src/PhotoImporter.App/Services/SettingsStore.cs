@@ -18,8 +18,11 @@ public sealed class AppSettings
 
 public static class SettingsStore
 {
-    private static readonly string FilePath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PhotoImporter", "settings.json");
+    /// <summary>PHOTOIMPORTER_SETTINGS overrides the location (used for testing without touching real settings).</summary>
+    private static readonly string FilePath =
+        Environment.GetEnvironmentVariable("PHOTOIMPORTER_SETTINGS") is { Length: > 0 } custom
+            ? custom
+            : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PhotoImporter", "settings.json");
 
     private static readonly JsonSerializerOptions Options = new() { WriteIndented = true };
 

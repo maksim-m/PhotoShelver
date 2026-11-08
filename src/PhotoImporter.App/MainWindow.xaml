@@ -66,11 +66,48 @@
             </DataTemplate.Triggers>
         </DataTemplate>
 
+        <!-- Clickable day header: collapses / expands the day -->
+        <Style x:Key="GroupHeaderButton" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="Transparent" CornerRadius="4" Padding="6,6,8,6">
+                            <ContentPresenter/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SubtleFillColorTertiaryBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <DataTemplate DataType="{x:Type vm:HeaderRow}">
-            <StackPanel Orientation="Horizontal" Margin="0,8,0,8">
-                <TextBlock Text="{Binding Title}" FontWeight="SemiBold"/>
-                <TextBlock Text="{Binding Subtitle, StringFormat='  ·  {0}'}" Style="{StaticResource Secondary}"/>
+            <StackPanel Margin="0,10,8,6">
+                <Button Style="{StaticResource GroupHeaderButton}" Margin="-6,0,0,0"
+                        Command="{Binding DataContext.ToggleGroupCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                        CommandParameter="{Binding}" ToolTip="Свернуть или развернуть">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock x:Name="Chevron" Text="&#xE70D;" FontFamily="{StaticResource IconFont}" FontSize="12"
+                                   VerticalAlignment="Center" Margin="0,2,10,0" Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                        <TextBlock Text="{Binding Title}" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding Subtitle}" Style="{StaticResource Secondary}" VerticalAlignment="Center" Margin="12,2,0,0"/>
+                    </StackPanel>
+                </Button>
+                <Border Height="1" Margin="0,4,0,0" Background="{DynamicResource CardStrokeColorDefaultBrush}"/>
             </StackPanel>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding IsCollapsed}" Value="True">
+                    <Setter TargetName="Chevron" Property="Text" Value="&#xE76C;"/>
+                </DataTrigger>
+            </DataTemplate.Triggers>
         </DataTemplate>
 
         <DataTemplate DataType="{x:Type vm:TileRow}">
@@ -104,8 +141,25 @@
                     <Button DockPanel.Dock="Right" Content="Выбрать…" Margin="8,0,0,0" Padding="12,5" Command="{Binding BrowseSourceCommand}"/>
                     <TextBox Text="{Binding SourcePath, Mode=OneWay}" IsReadOnly="True" VerticalContentAlignment="Center"/>
                 </DockPanel>
-                <CheckBox DockPanel.Dock="Top" Content="Включая подпапки" IsChecked="{Binding IncludeSubfolders}"
-                          IsEnabled="{Binding IsIdle}" Margin="0,0,0,8" HorizontalAlignment="Left"/>
+                <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center"
+                                Visibility="{Binding HasGroups, Converter={StaticResource BoolToVis}}">
+                        <Button Command="{Binding CollapseAllCommand}" Padding="8,3" Margin="0,0,6,0" ToolTip="Свернуть все дни">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE76C;" FontFamily="{StaticResource IconFont}" FontSize="10" VerticalAlignment="Center" Margin="0,1,6,0"/>
+                                <TextBlock Text="Свернуть все" FontSize="12"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Command="{Binding ExpandAllCommand}" Padding="8,3" ToolTip="Развернуть все дни">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE70D;" FontFamily="{StaticResource IconFont}" FontSize="10" VerticalAlignment="Center" Margin="0,1,6,0"/>
+                                <TextBlock Text="Развернуть все" FontSize="12"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                    <CheckBox Content="Включая подпапки" IsChecked="{Binding IncludeSubfolders}"
+                              IsEnabled="{Binding IsIdle}" HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                </DockPanel>
 
                 <StackPanel DockPanel.Dock="Bottom" Margin="0,12,0,0">
                     <StackPanel Visibility="{Binding ShowScanProgress, Converter={StaticResource BoolToVis}}" Margin="0,0,0,8">
