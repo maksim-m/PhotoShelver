@@ -30,6 +30,9 @@ public sealed class FolderNodeViewModel
     public FolderNodeViewModel? Parent { get; }
     public bool HasCount => Count > 0;
     public string CountText => $"+{Count}";
+
+    /// <summary>Accessible name, e.g. "2026-11-05 +2 NEW" (screen readers and UI tests).</summary>
+    public string AutomationName => Name + (HasCount ? " " + CountText : "") + (IsNew ? " NEW" : "");
     public IReadOnlyList<FolderNodeViewModel> Children { get; }
 
     /// <summary>Bound two-way to the TreeViewItem; a change coming from the UI is a user action.</summary>
