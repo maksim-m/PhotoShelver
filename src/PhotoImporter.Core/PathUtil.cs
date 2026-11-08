@@ -63,17 +63,39 @@ public static class PathUtil
         }
     }
 
-    /// <summary>Checks whether the file can be opened for writing (detects write-protected media) without modifying it.</summary>
+    /// <summary>
+    /// Whether the file could be deleted after a move: false for a read-only volume (e.g. an SD card with the
+    /// lock switch on) or a file with the read-only attribute. Nothing is opened for writing.
+    /// Note: opening a file for writing is NOT a valid test - Windows allows it on read-only volumes and only
+    /// refuses the actual write.
+    /// </summary>
     public static bool IsWritable(string filePath)
     {
         try
         {
-            using var _ = new FileStream(filePath, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite | FileShare.Delete);
-            return true;
+            if (File.GetAttributes(filePath).HasFlag(FileAttributes.ReadOnly)) return false;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             return false;
         }
+        return !IsReadOnlyVolume(filePath);
     }
+
+    /// <summary>True when the volume holding <paramref name="path"/> is mounted read-only.</summary>
+    public static bool IsReadOnlyVolume(string path)
+    {
+        const uint fileReadOnlyVolume = 0x00080000;
+        var volume = VolumeOf(path);
+        if (volume is null) return false;
+        return GetVolumeInformationW(volume, null, 0, out _, out _, out var flags, null, 0)
+               && (flags & fileReadOnlyVolume) != 0;
+    }
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
+    [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+    private static extern bool GetVolumeInformationW(
+        string rootPathName, char[]? volumeNameBuffer, uint volumeNameSize,
+        out uint volumeSerialNumber, out uint maximumComponentLength, out uint fileSystemFlags,
+        char[]? fileSystemNameBuffer, uint fileSystemNameSize);
 }

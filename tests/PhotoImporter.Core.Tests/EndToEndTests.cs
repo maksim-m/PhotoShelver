@@ -6,7 +6,7 @@ namespace PhotoImporter.Core.Tests;
 /// <summary>Full pipeline over the committed fixtures, as the app runs it.</summary>
 public class EndToEndTests
 {
-    private static readonly string[] ExpectedTree =
+    internal static readonly string[] ExpectedTree =
     [
         @"2025\12-31\BROKEN.JPG",
         @"2025\12-31\EMPTY.JPG",

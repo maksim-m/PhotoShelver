@@ -38,6 +38,24 @@ public class PlacementAndRecoveryTests
     }
 
     [Fact]
+    public void WritabilityCheckDoesNotOpenTheFileAndRespectsReadOnlyAttribute()
+    {
+        using var dir = new TempDir();
+        var normal = dir.File("a.jpg", "a");
+        var readOnly = dir.File("b.jpg", "b");
+        File.SetAttributes(readOnly, FileAttributes.ReadOnly);
+
+        Assert.True(PathUtil.IsWritable(normal));
+        Assert.False(PathUtil.IsWritable(readOnly));
+        Assert.False(PathUtil.IsReadOnlyVolume(normal));
+
+        // Holding the file exclusively must not change the answer: the check never opens it.
+        using (new FileStream(normal, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+            Assert.True(PathUtil.IsWritable(normal));
+        File.SetAttributes(readOnly, FileAttributes.Normal);
+    }
+
+    [Fact]
     public void SameVolumeDetection()
     {
         using var dir = new TempDir();

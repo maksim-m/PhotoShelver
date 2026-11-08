@@ -32,6 +32,14 @@ python tools/mutation_check.py
 
 Тестовые фикстуры (`tests/PhotoImporter.Core.Tests/Fixtures/media`) синтетические, их пересоздаёт `generate_fixtures.py` (нужен Pillow).
 
+### Проверка на реальных носителях
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools/run_real_volume_tests.ps1
+```
+
+Создаёт два временных виртуальных диска exFAT (как SD-карта): обычный и только для чтения с тестовыми файлами. Прогоняет на них тесты `Category=RealVolume` и удаляет диски. Нужны права администратора, будет запрос UAC. Для настоящей карты или USB-диска задайте `PHOTOIMPORTER_TEST_VOLUME` (подробности в начале `RealVolumeTests.cs`).
+
 ## Готовый exe
 
 ```powershell
