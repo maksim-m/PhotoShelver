@@ -2,8 +2,53 @@ namespace PhotoImporter.Core;
 
 public static class PathUtil
 {
-    private static string Normalize(string path) =>
-        Path.TrimEndingDirectorySeparator(Path.GetFullPath(path)) + Path.DirectorySeparatorChar;
+    /// <summary>Full path with exactly one trailing separator ("E:\" stays "E:\", "E:\Photos" becomes "E:\Photos\").</summary>
+    public static string WithTrailingSeparator(string path)
+    {
+        var full = Path.GetFullPath(path);
+        return Path.EndsInDirectorySeparator(full) ? full : full + Path.DirectorySeparatorChar;
+    }
+
+    /// <summary>Full path without a trailing separator, except for a drive root ("E:\").</summary>
+    public static string WithoutTrailingSeparator(string path) => Path.TrimEndingDirectorySeparator(Path.GetFullPath(path));
+
+    private static string Normalize(string path) => WithTrailingSeparator(path);
+
+    /// <summary>
+    /// Files under <paramref name="root"/>. Never follows folder links (junctions, symbolic links): a link can point
+    /// back to a parent (endless loop) or to unrelated data. Cloud-file folders (OneDrive) are not links and are walked.
+    /// </summary>
+    public static IEnumerable<FileInfo> EnumerateFiles(string root, bool recursive, FileAttributes skip, string pattern = "*")
+    {
+        var options = new EnumerationOptions
+        {
+            RecurseSubdirectories = recursive,
+            IgnoreInaccessible = true,
+            AttributesToSkip = skip,
+            ReturnSpecialDirectories = false,
+            MatchType = MatchType.Win32,
+        };
+        return new System.IO.Enumeration.FileSystemEnumerable<FileInfo>(
+            root, (ref System.IO.Enumeration.FileSystemEntry e) => (FileInfo)e.ToFileSystemInfo(), options)
+        {
+            ShouldIncludePredicate = (ref System.IO.Enumeration.FileSystemEntry e) =>
+                !e.IsDirectory && System.IO.Enumeration.FileSystemName.MatchesWin32Expression(pattern, e.FileName, ignoreCase: true),
+            ShouldRecursePredicate = (ref System.IO.Enumeration.FileSystemEntry e) =>
+                !e.Attributes.HasFlag(FileAttributes.ReparsePoint) || !IsFolderLink(e.ToFullPath()),
+        };
+    }
+
+    private static bool IsFolderLink(string path)
+    {
+        try
+        {
+            return new DirectoryInfo(path).LinkTarget is not null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return true; // unknown kind of link: do not follow
+        }
+    }
 
     /// <summary>True when the paths are the same folder or one contains the other.</summary>
     public static bool AreNestedOrEqual(string a, string b)

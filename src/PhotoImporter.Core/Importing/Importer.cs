@@ -184,7 +184,7 @@ public sealed class Importer
     private static bool IsFatal(Exception ex) => ex is OutOfMemoryException or StackOverflowException or AccessViolationException;
 
     private static bool SamePath(string a, string b) =>
-        string.Equals(Path.GetFullPath(a), Path.GetFullPath(b), StringComparison.OrdinalIgnoreCase);
+        string.Equals(PathUtil.WithoutTrailingSeparator(a), PathUtil.WithoutTrailingSeparator(b), StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Rename within the same volume; tries name, name_1, name_2… without overwriting.</summary>
     private string MoveSameVolume(ImportJob job)

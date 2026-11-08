@@ -79,7 +79,8 @@ public static class DuplicateDetector
                 ct.ThrowIfCancellationRequested();
                 if (result[file].State == DuplicateState.New)
                 {
-                    var folder = Path.Combine(targetRoot, template.Format(file.Date!.Value.Local));
+                    // Exactly the folder the import would write to.
+                    var folder = Importing.ImportPlan.DestinationFolder(targetRoot, template, file);
                     if (!folderIndex.TryGetValue(folder, out var bySize))
                         folderIndex[folder] = bySize = IndexFolder(folder);
 

@@ -20,8 +20,7 @@ public static partial class ImportLeftovers
     {
         var result = new List<FileInfo>();
         if (!Directory.Exists(root)) return result;
-        var options = new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true, AttributesToSkip = 0 };
-        foreach (var file in new DirectoryInfo(root).EnumerateFiles("*.importing", options))
+        foreach (var file in PathUtil.EnumerateFiles(root, recursive: true, skip: 0, pattern: "*.importing"))
         {
             ct.ThrowIfCancellationRequested();
             if (IsLeftover(file.Name)) result.Add(file);

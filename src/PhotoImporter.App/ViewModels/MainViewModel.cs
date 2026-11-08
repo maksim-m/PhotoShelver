@@ -22,6 +22,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private readonly Importer _importer = new();
     private readonly DispatcherTimer _refreshTimer;
     private readonly DispatcherTimer _templateTimer;
+    private readonly DispatcherTimer _environmentTimer;
+    private (bool Source, bool Target) _foldersExist;
     private readonly bool _initializing;
 
     private List<MediaItemViewModel> _items = [];
@@ -38,6 +40,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _thumbnails = new ThumbnailService(dispatcher);
         _refreshTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(120), DispatcherPriority.Background, (_, _) => { _refreshTimer!.Stop(); Refresh(); }, dispatcher) { IsEnabled = false };
         _templateTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(400), DispatcherPriority.Background, (_, _) => { _templateTimer!.Stop(); _ = RunDuplicateCheckAsync(); }, dispatcher) { IsEnabled = false };
+        // A card or disk can be plugged in or removed at any time: notice it without waiting for a click.
+        _environmentTimer = new DispatcherTimer(TimeSpan.FromSeconds(2), DispatcherPriority.Background, (_, _) => CheckFolders(), dispatcher) { IsEnabled = false };
 
         _initializing = true;
         SourcePath = settings.SourcePath;
@@ -95,8 +99,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     {
         ParseTemplate(value);
         if (_initializing) return;
-        // Duplicate marks belong to the old template: block the import until the new check has run.
-        _duplicatesChecked = false;
+        // Duplicate marks belong to the old template: the check key no longer matches, so the import is
+        // blocked until the new check (debounced below) has run.
         ResetTreeView();
         _templateTimer.Stop();
         _templateTimer.Start();
@@ -137,8 +141,19 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     partial void OnIsMoveModeChanged(bool value) { if (!_initializing) Notice = null; }
 
+    private void CheckFolders()
+    {
+        var now = (Directory.Exists(SourcePath), Directory.Exists(TargetPath));
+        if (now == _foldersExist) return;
+        _foldersExist = now;
+        UpdateState();
+        ScheduleRefresh();
+    }
+
     public void Initialize()
     {
+        _foldersExist = (Directory.Exists(SourcePath), Directory.Exists(TargetPath));
+        _environmentTimer.Start();
         StartScan();
         _ = FindLeftoversAsync();
     }
@@ -305,7 +320,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     }
 
     private bool CanImport() =>
-        !IsBusy && _duplicatesChecked && BlockingReason is null && _template is not null && SelectedCount > 0
+        !IsBusy && DuplicatesChecked && BlockingReason is null && _template is not null && SelectedCount > 0
         && Directory.Exists(SourcePath) && Directory.Exists(TargetPath);
 
     [RelayCommand(CanExecute = nameof(CanImport))]
@@ -315,7 +330,16 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         var target = TargetPath!;
         var template = _template!;
         var mode = IsMoveMode ? ImportMode.Move : ImportMode.Copy;
-        var jobs = ImportPlan.CreateJobs(_items.Where(i => i.IsSelected && i.CanBeImported).Select(i => i.File), target, template);
+        List<ImportJob> jobs;
+        try
+        {
+            jobs = ImportPlan.CreateJobs(_items.Where(i => i.IsSelected && i.CanBeImported).Select(i => i.File), target, template);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or IOException)
+        {
+            Notice = $"Не удалось подготовить импорт: {ex.Message}";
+            return;
+        }
         if (jobs.Count == 0) return;
 
         // Only a whole write-protected volume blocks a move; single protected files are copied and kept (see Importer).
@@ -463,15 +487,29 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _thumbnails.ClearQueue();
         foreach (var item in _items) item.IsAlive = false;
         _items = [];
-        _duplicatesChecked = false;
+        _checkedKey = null;
+        _attemptedKey = null;
         _skippedOther = 0;
         Rows.Clear();
         HasGroups = false;
         ScheduleRefresh();
     }
 
-    /// <summary>True once the current items went through a successful duplicate check (required to import).</summary>
-    private bool _duplicatesChecked;
+    /// <summary>
+    /// What the last successful duplicate check was done for (target folder + template), or null.
+    /// The import is allowed only when it matches the current target and template exactly - so a target that
+    /// appears later (a disk plugged in) or a changed template always gets a fresh check first.
+    /// </summary>
+    private string? _checkedKey;
+
+    /// <summary>Key of the last check that was started (prevents re-running a failing check in a loop).</summary>
+    private string? _attemptedKey;
+
+    private string CurrentCheckKey() =>
+        (Directory.Exists(TargetPath) && !IsNested() ? PathUtil.WithoutTrailingSeparator(TargetPath!) : "")
+        + "|" + (_template?.Pattern ?? "");
+
+    private bool DuplicatesChecked => _checkedKey is not null && _checkedKey == CurrentCheckKey();
 
     private async Task RunDuplicateCheckAsync()
     {
@@ -479,7 +517,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         var cts = _duplicateCts = new CancellationTokenSource();
         var token = cts.Token;
         var items = _items;
-        _duplicatesChecked = false;
+        _checkedKey = null;
         if (items.Count == 0 || IsScanning)
         {
             ScheduleRefresh();
@@ -489,6 +527,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         var files = items.Select(i => i.File).ToList();
         var target = Directory.Exists(TargetPath) && !IsNested() ? TargetPath : null;
         var template = _template;
+        var key = CurrentCheckKey();
+        _attemptedKey = key;
 
         IsCheckingDuplicates = true;
         ScanIndeterminate = false;
@@ -506,7 +546,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             if (cts != _duplicateCts || items != _items) return;
             foreach (var item in items)
                 item.ApplyDuplicate(result.GetValueOrDefault(item.File));
-            _duplicatesChecked = true;
+            _checkedKey = key;
         }
         catch (OperationCanceledException)
         {
@@ -739,6 +779,13 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         ImportCommand.NotifyCanExecuteChanged();
         BrowseSourceCommand.NotifyCanExecuteChanged();
         BrowseTargetCommand.NotifyCanExecuteChanged();
+        DeleteLeftoversCommand.NotifyCanExecuteChanged();
+
+        // The target or template is no longer the one the duplicates were checked for (e.g. the target disk
+        // was plugged in after the check): check again. Not while typing a template (that check is debounced).
+        if (_items.Count > 0 && !IsBusy && _template is not null && !_templateTimer.IsEnabled
+            && !DuplicatesChecked && CurrentCheckKey() != _attemptedKey)
+            _ = RunDuplicateCheckAsync();
     }
 
     private static string? PickFolder(string title, string? current)
@@ -750,6 +797,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     public void Dispose()
     {
+        _environmentTimer.Stop();
         _scanCts?.Cancel();
         _duplicateCts?.Cancel();
         _treeCts?.Cancel();

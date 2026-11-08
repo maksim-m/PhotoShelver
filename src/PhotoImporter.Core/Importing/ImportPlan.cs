@@ -10,11 +10,11 @@ public static class ImportPlan
     {
         if (file.Date is not { } date)
             throw new InvalidOperationException($"Нет даты для файла {file.Path}");
-        var root = Path.GetFullPath(targetRoot);
+        var root = PathUtil.WithTrailingSeparator(targetRoot); // "E:\" and "E:\Photos\" alike
         var folder = Path.GetFullPath(Path.Combine(root, template.Format(date.Local)));
 
         // Defence in depth: a validated template can never leave the target root.
-        if (!folder.StartsWith(Path.TrimEndingDirectorySeparator(root) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+        if (!folder.StartsWith(root, StringComparison.OrdinalIgnoreCase) || folder.Length <= root.Length)
             throw new InvalidOperationException($"Папка «{folder}» вне папки-цели");
         return folder;
     }

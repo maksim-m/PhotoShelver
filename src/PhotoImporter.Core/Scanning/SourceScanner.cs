@@ -24,17 +24,9 @@ public static class SourceScanner
 {
     public static EnumerationResult Enumerate(string root, bool recursive, CancellationToken ct = default)
     {
-        var options = new EnumerationOptions
-        {
-            RecurseSubdirectories = recursive,
-            IgnoreInaccessible = true,
-            AttributesToSkip = FileAttributes.Hidden | FileAttributes.System,
-            ReturnSpecialDirectories = false,
-        };
-
         var files = new List<SourceFile>();
         var skipped = 0;
-        foreach (var info in new DirectoryInfo(root).EnumerateFiles("*", options))
+        foreach (var info in PathUtil.EnumerateFiles(root, recursive, FileAttributes.Hidden | FileAttributes.System))
         {
             ct.ThrowIfCancellationRequested();
             if (!MediaTypes.TryGetKind(info.Name, out var kind))
