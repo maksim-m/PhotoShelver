@@ -58,8 +58,9 @@ public static class DuplicateDetector
                 .GroupBy(x => x.Hash!.Value);
             foreach (var same in hashed)
             {
+                // Primary = the least nested file (originals usually live above "backup" folders), then by path.
                 var ordered = same.Select(x => x.File)
-                    .OrderBy(f => f.Date!.Value.Local)
+                    .OrderBy(f => f.Path.Count(c => c == '\\'))
                     .ThenBy(f => f.Path, StringComparer.OrdinalIgnoreCase)
                     .ToList();
                 foreach (var dup in ordered.Skip(1))
