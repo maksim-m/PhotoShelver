@@ -273,6 +273,13 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         {
             result = await Task.Run(() => _importer.Run(jobs, mode, progress, token));
         }
+        catch (Exception ex)
+        {
+            // Should not happen (the importer reports per-file errors), but never crash mid-import.
+            Notice = $"Импорт прерван из-за непредвиденной ошибки: {ex.Message}";
+            StartScan();
+            return;
+        }
         finally
         {
             IsImporting = false;

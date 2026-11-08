@@ -67,7 +67,7 @@ public static class SourceScanner
                 if (!File.Exists(file.Path)) throw new FileNotFoundException("Файл не найден", file.Path);
                 file.Date = reader.Read(file.Path, file.Kind, file.LastWriteTimeUtc);
             }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or StackOverflowException or AccessViolationException))
             {
                 file.Error = ex.Message;
             }

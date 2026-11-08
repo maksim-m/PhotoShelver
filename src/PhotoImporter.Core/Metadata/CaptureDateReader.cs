@@ -25,10 +25,9 @@ public sealed partial class CaptureDateReader
                 ? ReadPhoto(path)
                 : MediaTypes.IsIsoBmffVideo(path) ? ReadVideo(path) : null;
         }
-        catch (Exception ex) when (ex is IOException or ImageProcessingException or UnauthorizedAccessException
-                                       or EndOfStreamException or ArgumentException or NotSupportedException)
+        catch (Exception ex) when (ex is not (OutOfMemoryException or StackOverflowException or AccessViolationException))
         {
-            // Unreadable/unsupported metadata: fall back to file time.
+            // Malformed, truncated or unsupported metadata (parsers may throw anything): fall back to file time.
         }
 
         return fromMetadata ?? new CaptureDate(

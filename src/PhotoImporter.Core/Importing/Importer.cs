@@ -35,6 +35,9 @@ public sealed class Importer
     /// <summary>Test hook: handle moves as cross-volume (copy + verify + delete).</summary>
     internal bool TreatAsDifferentVolumes { get; init; }
 
+    /// <summary>Test hook: called with the temp file path after copying, before verification.</summary>
+    internal Action<string>? AfterTempWritten { get; init; }
+
     public ImportResult Run(
         IReadOnlyList<ImportJob> jobs,
         ImportMode mode,
@@ -65,27 +68,11 @@ public sealed class Importer
             Report(i, bytesDone, job.SourcePath, force: true);
             try
             {
-                Directory.CreateDirectory(job.DestinationFolder);
-                var dest = mode == ImportMode.Move && !TreatAsDifferentVolumes && PathUtil.IsSameVolume(job.SourcePath, job.DestinationFolder)
-                    ? MoveSameVolume(job)
-                    : CopyViaTemp(job, verify: mode == ImportMode.Move, b => Report(i, startBytes + b, job.SourcePath));
-
-                imported.Add(new ImportedFile(job.SourcePath, dest));
-
-                if (mode == ImportMode.Move && File.Exists(job.SourcePath) && !SamePath(job.SourcePath, dest))
-                {
-                    try
-                    {
-                        File.Delete(job.SourcePath);
-                    }
-                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-                    {
-                        failures.Add(new ImportFailure(job.SourcePath, $"Скопирован в «{dest}», но исходный файл не удалён: {ex.Message}"));
-                    }
-                }
+                ImportOne(job, mode, b => Report(i, startBytes + b, job.SourcePath), imported, failures);
             }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
+            catch (Exception ex) when (!IsFatal(ex))
             {
+                // Any per-file problem is reported; the source is never deleted on this path.
                 failures.Add(new ImportFailure(job.SourcePath, ex.Message));
             }
             bytesDone = startBytes + job.Size;
@@ -94,6 +81,51 @@ public sealed class Importer
         Report(jobs.Count, bytesDone, null, force: true);
         return new ImportResult(imported, failures, false);
     }
+
+    private void ImportOne(ImportJob job, ImportMode mode, Action<long> onBytes, List<ImportedFile> imported, List<ImportFailure> failures)
+    {
+        var source = new FileInfo(job.SourcePath);
+        if (!source.Exists)
+            throw new FileNotFoundException("Исходный файл не найден", job.SourcePath);
+        if (SamePath(source.DirectoryName!, job.DestinationFolder))
+            throw new IOException("Файл уже находится в папке назначения");
+
+        // Snapshot to detect changes of the source while it is being copied.
+        var sizeBefore = source.Length;
+        var writeTimeBefore = source.LastWriteTimeUtc;
+
+        Directory.CreateDirectory(job.DestinationFolder);
+
+        if (mode == ImportMode.Move && !TreatAsDifferentVolumes && PathUtil.IsSameVolume(job.SourcePath, job.DestinationFolder))
+        {
+            // Atomic rename: the file is either still at the source or already at the destination.
+            imported.Add(new ImportedFile(job.SourcePath, MoveSameVolume(job)));
+            return;
+        }
+
+        var dest = CopyViaTemp(job, verify: mode == ImportMode.Move, onBytes);
+        imported.Add(new ImportedFile(job.SourcePath, dest));
+        if (mode != ImportMode.Move) return;
+
+        // Cross-volume move: delete the source only if it is exactly what was copied and verified.
+        source.Refresh();
+        if (!source.Exists) return;
+        if (source.Length != sizeBefore || source.LastWriteTimeUtc != writeTimeBefore)
+        {
+            failures.Add(new ImportFailure(job.SourcePath, $"Скопирован в «{dest}», но исходный файл изменился во время копирования и не удалён"));
+            return;
+        }
+        try
+        {
+            File.Delete(job.SourcePath);
+        }
+        catch (Exception ex) when (!IsFatal(ex))
+        {
+            failures.Add(new ImportFailure(job.SourcePath, $"Скопирован в «{dest}», но исходный файл не удалён: {ex.Message}"));
+        }
+    }
+
+    private static bool IsFatal(Exception ex) => ex is OutOfMemoryException or StackOverflowException or AccessViolationException;
 
     private static bool SamePath(string a, string b) =>
         string.Equals(Path.GetFullPath(a), Path.GetFullPath(b), StringComparison.OrdinalIgnoreCase);
@@ -106,13 +138,14 @@ public sealed class Importer
     }
 
     /// <summary>Copies to a temporary *.importing file, optionally verifies the hash, then renames to a free name.</summary>
-    private static string CopyViaTemp(ImportJob job, bool verify, Action<long> onBytes)
+    private string CopyViaTemp(ImportJob job, bool verify, Action<long> onBytes)
     {
         var fileName = Path.GetFileName(job.SourcePath);
         var temp = Path.Combine(job.DestinationFolder, $"{fileName}.{Guid.NewGuid():N}.importing");
         try
         {
             var sourceHash = CopyAndHash(job.SourcePath, temp, onBytes);
+            AfterTempWritten?.Invoke(temp);
 
             if (verify)
             {
@@ -122,8 +155,15 @@ public sealed class Importer
             }
 
             var src = new FileInfo(job.SourcePath);
-            File.SetCreationTimeUtc(temp, src.CreationTimeUtc);
-            File.SetLastWriteTimeUtc(temp, src.LastWriteTimeUtc);
+            try
+            {
+                File.SetCreationTimeUtc(temp, src.CreationTimeUtc);
+                File.SetLastWriteTimeUtc(temp, src.LastWriteTimeUtc);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+            {
+                // Timestamps are nice to have; some file systems reject them.
+            }
 
             return PlaceWithSuffix(fileName, job.DestinationFolder, candidate => File.Move(temp, candidate, overwrite: false));
         }
@@ -133,7 +173,7 @@ public sealed class Importer
             {
                 if (File.Exists(temp)) File.Delete(temp);
             }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            catch (Exception ex) when (!IsFatal(ex))
             {
                 // Best effort cleanup.
             }
