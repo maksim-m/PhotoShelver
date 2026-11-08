@@ -7,6 +7,7 @@ namespace PhotoImporter.Core.Tests;
 /// Runs only on a real second volume (an SD card, a USB disk, a virtual disk):
 ///   PHOTOIMPORTER_TEST_VOLUME           writable volume, e.g. "X:\" (a folder "PhotoImporterTest-*" is created and removed)
 ///   PHOTOIMPORTER_TEST_READONLY_VOLUME  read-only volume with the fixtures copied to "&lt;root&gt;\card"
+///     (the test refuses to run unless the volume is read-only and "card" holds exactly the fixtures)
 /// Run:  dotnet test --filter Category=RealVolume
 /// </summary>
 [Trait("Category", "RealVolume")]
@@ -34,7 +35,14 @@ public class RealVolumeTests
     /// <summary>A scratch folder on the second volume, removed afterwards.</summary>
     private sealed class VolumeDir : IDisposable
     {
-        public VolumeDir() => Directory.CreateDirectory(Path = System.IO.Path.Combine(Writable!, "PhotoImporterTest-" + Guid.NewGuid().ToString("N")[..8]));
+        public VolumeDir()
+        {
+            Path = System.IO.Path.Combine(Writable!, "PhotoImporterTest-" + Guid.NewGuid().ToString("N")[..8]);
+            // Only ever delete a folder this test created.
+            if (Directory.Exists(Path) || File.Exists(Path)) throw new InvalidOperationException($"SAFETY: {Path} already exists");
+            Directory.CreateDirectory(Path);
+        }
+
         public string Path { get; }
         public void Dispose()
         {
@@ -118,13 +126,18 @@ public class RealVolumeTests
     public async Task MoveFromWriteProtectedCardKeepsEverySource()
     {
         var card = Path.Combine(ReadOnly!, "card");
+
+        // SAFETY: this test runs a MOVE from <volume>\card. Refuse to touch anything unless the volume really is
+        // read-only and the folder holds exactly our fixtures - so a misconfigured variable can never delete real files.
+        Assert.True(PathUtil.IsReadOnlyVolume(card), $"SAFETY: {ReadOnly} is not a read-only volume - refusing to run a move from it");
+        var cardBefore = Snapshot.Take(card);
+        Assert.Equal(Snapshot.Take(Fixtures.MediaRoot).Files, cardBefore.Files);
+
         using var local = new TempDir();
         var library = Path.Combine(local.Path, "library");
         Directory.CreateDirectory(library);
-        var cardBefore = Snapshot.Take(card);
 
-        // The app uses this to offer "copy instead of move" before starting.
-        Assert.True(PathUtil.IsReadOnlyVolume(card));
+        // The app uses this to refuse a move up front.
         Assert.False(PathUtil.IsWritable(Directory.EnumerateFiles(card, "*.JPG", SearchOption.AllDirectories).First()));
 
         var outcome = await Pipeline.RunAsync(card, library, ImportMode.Move);
