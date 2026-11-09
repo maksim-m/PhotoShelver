@@ -54,6 +54,17 @@ public sealed class Importer
     /// <summary>Test hook: pretend the file system does not support reading around the cache.</summary>
     internal bool ForceCachedVerification { get; init; }
 
+    /// <summary>
+    /// Commits a placed file (its name included) to the disk before the source is deleted. Test hook: replaceable.
+    /// FlushFileBuffers on a file makes NTFS flush its log (which holds the rename) and FAT/exFAT write the file's
+    /// directory entry. The file is opened for writing only to be allowed to flush; nothing is written.
+    /// </summary>
+    internal Action<string> CommitPlaced { get; init; } = path =>
+    {
+        using var stream = new FileStream(path, FileMode.Open, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete, 1);
+        stream.Flush(flushToDisk: true);
+    };
+
     /// <summary>Waits between retries of operations blocked by another process (tests use short ones).</summary>
     internal IReadOnlyList<TimeSpan> RetryDelays { get; init; } = TransientRetry.DefaultDelays;
 
@@ -163,6 +174,18 @@ public sealed class Importer
         if (source.Length != sizeBefore || source.LastWriteTimeUtc != writeTimeBefore)
         {
             failures.Add(new ImportFailure(job.SourcePath, $"Скопирован в «{dest}», но исходный файл изменился во время копирования и не удалён"));
+            return;
+        }
+        try
+        {
+            // The rename "temp → final name" may still sit in the target's cache, while deleting from a card is written
+            // at once: after a power cut or a crash the target could hold only the temp file and the card nothing.
+            // So the placed file is committed to the disk first.
+            TransientRetry.Run(() => CommitPlaced(dest), RetryDelays);
+        }
+        catch (Exception ex) when (!IsFatal(ex))
+        {
+            failures.Add(new ImportFailure(job.SourcePath, $"Скопирован в «{dest}», но не удалось завершить запись на диск, исходный файл не удалён: {ex.Message}"));
             return;
         }
         try

@@ -73,6 +73,65 @@ public class ImporterSafetyTests
         Assert.DoesNotContain(Directory.GetFiles(dest), f => !f.EndsWith(".importing", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public void PlacedFileIsCommittedToDiskBeforeTheSourceIsDeleted()
+    {
+        using var dir = new TempDir();
+        var mtime = new DateTime(2024, 6, 1, 10, 0, 0, DateTimeKind.Utc);
+        var src = dir.File(@"src\IMG.JPG", "photo", mtime);
+        var dest = Path.Combine(dir.Path, "dst");
+        var commits = new List<(string Path, bool SourceStillThere)>();
+        var importer = new Importer
+        {
+            TreatAsDifferentVolumes = true,
+            CommitPlaced = path => commits.Add((path, File.Exists(src))),
+        };
+
+        var result = importer.Run([Job(src, dest)], ImportMode.Move, null, default);
+
+        var placed = Assert.Single(result.Imported).DestinationPath;
+        Assert.Equal([(placed, true)], commits); // the final file, while the source still existed
+        Assert.False(File.Exists(src));
+    }
+
+    [Fact]
+    public void SourceIsKeptWhenThePlacedFileCannotBeCommitted()
+    {
+        using var dir = new TempDir();
+        var src = dir.File(@"src\IMG.JPG", "photo");
+        var dest = Path.Combine(dir.Path, "dst");
+        var importer = new Importer
+        {
+            TreatAsDifferentVolumes = true,
+            CommitPlaced = _ => throw new IOException("The device is not ready."),
+        };
+
+        var result = importer.Run([Job(src, dest)], ImportMode.Move, null, default);
+
+        Assert.Equal("photo", File.ReadAllText(Assert.Single(result.Imported).DestinationPath));
+        Assert.Contains("не удалён", Assert.Single(result.Failures).Message);
+        Assert.Equal("photo", File.ReadAllText(src));
+    }
+
+    [Fact]
+    public void CommittingDoesNotChangeThePlacedFile()
+    {
+        using var dir = new TempDir();
+        var mtime = new DateTime(2024, 6, 1, 10, 0, 0, DateTimeKind.Utc);
+        var src = dir.File(@"src\IMG.JPG", "photo", mtime);
+        var dest = Path.Combine(dir.Path, "dst");
+
+        // The real commit (open for writing + flush) on a cross-volume move.
+        var result = new Importer { TreatAsDifferentVolumes = true }.Run([Job(src, dest)], ImportMode.Move, null, default);
+
+        var placed = Assert.Single(result.Imported).DestinationPath;
+        Assert.Empty(result.Failures);
+        Assert.Equal("photo", File.ReadAllText(placed));
+        Assert.Equal(mtime, File.GetLastWriteTimeUtc(placed));
+        Assert.False(File.GetAttributes(placed).HasFlag(FileAttributes.ReadOnly));
+        Assert.False(File.Exists(src));
+    }
+
     [Theory]
     [InlineData(ImportMode.Copy)]
     [InlineData(ImportMode.Move)]
