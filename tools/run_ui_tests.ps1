@@ -1,6 +1,7 @@
 <#
 Runs the end-to-end UI tests: the real PhotoImporter window is started and driven through UI Automation.
-Windows will appear and close while the tests run - do not use the mouse/keyboard on them meanwhile.
+Windows will appear and close while the tests run. Do not use the mouse or keyboard meanwhile:
+some tests click with the real mouse (double click, context menu).
 
 Each test uses its own temp folder with a copy of the test fixtures and its own settings file
 (PHOTOIMPORTER_SETTINGS), so your real settings, photos and libraries are never touched.

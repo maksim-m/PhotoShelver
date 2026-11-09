@@ -52,7 +52,7 @@ public sealed class AppSession : IDisposable
     private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(30);
     private readonly Process _process;
 
-    public AppSession(UiSettings settings, string workDir)
+    public AppSession(UiSettings settings, string workDir, IReadOnlyDictionary<string, string>? environment = null)
     {
         SettingsPath = Path.Combine(workDir, "settings.json");
         File.WriteAllText(SettingsPath, JsonSerializer.Serialize(new
@@ -69,6 +69,7 @@ public sealed class AppSession : IDisposable
         }));
 
         var start = new ProcessStartInfo(ExePath) { UseShellExecute = false };
+        foreach (var (key, value) in environment ?? new Dictionary<string, string>()) start.Environment[key] = value;
         start.Environment["PHOTOIMPORTER_SETTINGS"] = SettingsPath; // SAFETY: the user's settings are never used
         _process = Process.Start(start) ?? throw new InvalidOperationException("could not start the app");
 
@@ -151,6 +152,42 @@ public sealed class AppSession : IDisposable
 
     public static bool IsSelected(AutomationElement element) =>
         ((SelectionItemPattern)element.GetCurrentPattern(SelectionItemPattern.Pattern)).Current.IsSelected;
+
+    // ---------------- real mouse input (for double clicks and context menus) ----------------
+
+    static AppSession() => SetProcessDpiAwarenessContext(new IntPtr(-4)); // per-monitor v2: UIA and cursor coordinates agree
+
+    /// <summary>Clicks with the real mouse at a point of the element (fractions of its width/height).</summary>
+    public void MouseClick(AutomationElement element, bool right = false, bool twice = false, double fx = 0.5, double fy = 0.5)
+    {
+        Window.SetFocus(); // bring the window to the front so it receives the input
+        Thread.Sleep(200);
+        var r = element.Current.BoundingRectangle;
+        SetCursorPos((int)(r.Left + r.Width * fx), (int)(r.Top + r.Height * fy));
+        Thread.Sleep(100);
+        var (down, up) = right ? (0x0008u, 0x0010u) : (0x0002u, 0x0004u);
+        for (var i = 0; i < (twice ? 2 : 1); i++)
+        {
+            mouse_event(down, 0, 0, 0, IntPtr.Zero);
+            mouse_event(up, 0, 0, 0, IntPtr.Zero);
+            Thread.Sleep(60);
+        }
+    }
+
+    /// <summary>Right-clicks the element and invokes an item of the context menu that opens.</summary>
+    public void ContextMenu(AutomationElement element, string itemAutomationId)
+    {
+        MouseClick(element, right: true);
+        AutomationElement? item = null;
+        WaitUntil(() => (item = AutomationElement.RootElement.FindFirst(TreeScope.Descendants, new AndCondition(
+            new PropertyCondition(AutomationElement.ProcessIdProperty, _process.Id),
+            new PropertyCondition(AutomationElement.AutomationIdProperty, itemAutomationId)))) is not null, $"context menu item '{itemAutomationId}'");
+        Click(item!);
+    }
+
+    [DllImport("user32.dll")] private static extern bool SetCursorPos(int x, int y);
+    [DllImport("user32.dll")] private static extern void mouse_event(uint flags, int dx, int dy, uint data, IntPtr extra);
+    [DllImport("user32.dll")] private static extern bool SetProcessDpiAwarenessContext(IntPtr value);
 
     public void SetTemplate(string text) =>
         ((ValuePattern)Find("Template").GetCurrentPattern(ValuePattern.Pattern)).SetValue(text);

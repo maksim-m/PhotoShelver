@@ -190,11 +190,39 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         }
     }
 
+    // ---------- Opening files (double click, context menu) ----------
+
+    // Parameter is object: recycled tile containers can briefly bind something else.
+    [RelayCommand]
+    private void OpenFile(object? parameter) => WithExistingFile(parameter, ShellLauncher.Open);
+
+    [RelayCommand]
+    private void ShowInFolder(object? parameter) => WithExistingFile(parameter, ShellLauncher.ShowInFolder);
+
+    private void WithExistingFile(object? parameter, Action<string> action)
+    {
+        if (parameter is not MediaItemViewModel item) return;
+        var path = item.File.Path;
+        if (!File.Exists(path))
+        {
+            Notice = $"Файл не найден (возможно, уже перемещён): {path}";
+            return;
+        }
+        try
+        {
+            action(path);
+        }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or IOException or InvalidOperationException)
+        {
+            Notice = $"Не удалось открыть «{Path.GetFileName(path)}»: {ex.Message}";
+        }
+    }
+
     [RelayCommand]
     private void ShowLeftovers()
     {
         if (_leftovers.FirstOrDefault() is { } first)
-            System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{first}\"");
+            ShellLauncher.ShowInFolder(first);
     }
 
     [RelayCommand(CanExecute = nameof(IsIdle))]

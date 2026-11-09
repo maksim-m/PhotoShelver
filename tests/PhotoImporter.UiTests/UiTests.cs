@@ -241,6 +241,46 @@ public class UiTests
         Assert.Contains("Выбрано 16", app.Summary.Replace(' ', ' '));
     }
 
+    // ------------------------------------------------------------------ opening files
+
+    [UiFact]
+    public void DoubleClickAndContextMenuOpenOrRevealTheFile()
+    {
+        using var ws = new Workspace();
+        var shellLog = Path.Combine(ws.Root, "shell.log"); // the app records shell actions here instead of launching programs
+        using var app = new AppSession(new UiSettings(ws.Card, ws.Library), ws.Root,
+            new Dictionary<string, string> { ["PHOTOIMPORTER_SHELL_LOG"] = shellLog });
+        app.WaitReady();
+        string Log()
+        {
+            if (!File.Exists(shellLog)) return "";
+            // Share with the app's writes: reading must never make the app's append fail.
+            using var stream = new FileStream(shellLog, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            return new StreamReader(stream).ReadToEnd();
+        }
+
+        var tile = app.FindAll("TileName").First(); // the file name label of the first tile
+        var file = Directory.GetFiles(ws.Card, tile.Current.Name, SearchOption.AllDirectories).Single();
+        var checkbox = app.FindAll("TileCheck").First(c => c.Current.Name == tile.Current.Name);
+        var checkedBefore = AppSession.State(checkbox);
+
+        // Double click on the tile (on its name, away from the checkbox) opens the file.
+        app.MouseClick(tile, twice: true, fy: 0.5);
+        app.WaitUntil(() => Log().Contains($"open|{file}"), "double click to open the file");
+        Assert.Equal(checkedBefore, AppSession.State(checkbox)); // the selection is not toggled by opening
+
+        // Right click: "Show in folder" and "Open".
+        app.ContextMenu(tile, "TileReveal");
+        app.WaitUntil(() => Log().Contains($"reveal|{file}"), "context menu: show in folder");
+        app.ContextMenu(tile, "TileOpen");
+        app.WaitUntil(() => Log().Split('\n').Count(l => l.StartsWith($"open|{file}", StringComparison.Ordinal)) == 2, "context menu: open");
+
+        // A file that is gone (e.g. moved meanwhile) gives a message instead of an error.
+        File.Delete(file);
+        app.ContextMenu(tile, "TileOpen");
+        app.WaitUntil(() => (app.Notice ?? "").Contains("Файл не найден"), "'file not found' notice");
+    }
+
     // ------------------------------------------------------------------ guards & leftovers
 
     [UiFact]
