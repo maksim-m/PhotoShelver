@@ -4,7 +4,7 @@
         xmlns:local="clr-namespace:PhotoImporter.App"
         xmlns:vm="clr-namespace:PhotoImporter.App.ViewModels"
         xmlns:controls="clr-namespace:PhotoImporter.App.Controls"
-        Title="PhotoImporter" Width="1280" Height="820" MinWidth="960" MinHeight="600"
+        Title="PhotoImporter" Icon="/Assets/app.ico" Width="1280" Height="820" MinWidth="960" MinHeight="600"
         WindowStartupLocation="CenterScreen">
     <Window.Resources>
         <local:BoolToVisibilityConverter x:Key="BoolToVis"/>

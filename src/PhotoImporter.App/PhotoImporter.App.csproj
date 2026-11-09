@@ -6,6 +6,7 @@
     <AssemblyName>PhotoImporter</AssemblyName>
     <RootNamespace>PhotoImporter.App</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
     <NoWarn>$(NoWarn);WPF0001</NoWarn>
     <Version>0.1.0</Version>
   </PropertyGroup>
@@ -19,6 +20,7 @@
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.1" />
     <Using Include="System.IO" />
+    <Resource Include="Assets\app.ico" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\PhotoImporter.Core\PhotoImporter.Core.csproj" />
