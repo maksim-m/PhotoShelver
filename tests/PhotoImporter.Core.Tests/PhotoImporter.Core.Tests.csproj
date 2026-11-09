@@ -13,6 +13,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="Fixtures\media\**\*" CopyToOutputDirectory="PreserveNewest" LinkBase="Fixtures\media" />
+    <None Include="Fixtures\formats\**\*" CopyToOutputDirectory="PreserveNewest" LinkBase="Fixtures\formats" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\PhotoImporter.Core\PhotoImporter.Core.csproj" />

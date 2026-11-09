@@ -4,10 +4,15 @@ using System.Text;
 namespace PhotoImporter.Core.Metadata;
 
 /// <summary>Date/location information extracted from an MP4/MOV (ISO-BMFF / QuickTime) container.</summary>
+/// <param name="EmbeddedJpeg">
+/// A JPEG thumbnail the camera embedded in the container together with its own EXIF (Canon: moov/uuid/CNTH/CNDA).
+/// Its EXIF holds the capture time on the camera's clock - the same clock its photos use.
+/// </param>
 internal sealed record IsoBmffInfo(
     DateTime? CreationUtc,
     string? AppleCreationDate,
-    string? Iso6709Location);
+    string? Iso6709Location,
+    byte[]? EmbeddedJpeg = null);
 
 /// <summary>
 /// Minimal reader for the parts of MP4/MOV files we need: moov/mvhd creation time,
@@ -18,6 +23,10 @@ internal static class IsoBmffReader
     private static readonly DateTime Epoch1904 = new(1904, 1, 1, 0, 0, 0, DateTimeKind.Utc);
     private const int MaxDepth = 8;
     private const long MaxStringBox = 64 * 1024;
+    private const long MaxEmbeddedJpeg = 2 * 1024 * 1024;
+
+    /// <summary>Canon's metadata box in MP4 and CR3 files.</summary>
+    private static readonly Guid CanonUuid = new("85c0b687-820f-11e0-8111-f4ce462b6a48");
 
     public static IsoBmffInfo Read(string path)
     {
@@ -36,7 +45,7 @@ internal static class IsoBmffReader
                 break;
             }
         }
-        return new IsoBmffInfo(state.CreationUtc, state.AppleCreationDate, state.AppleLocation ?? state.UdtaLocation);
+        return new IsoBmffInfo(state.CreationUtc, state.AppleCreationDate, state.AppleLocation ?? state.UdtaLocation, state.EmbeddedJpeg);
     }
 
     private sealed class State
@@ -45,6 +54,7 @@ internal static class IsoBmffReader
         public string? AppleCreationDate;
         public string? AppleLocation;
         public string? UdtaLocation;
+        public byte[]? EmbeddedJpeg;
     }
 
     private readonly record struct Box(string Type, long PayloadStart, long End);
@@ -68,8 +78,29 @@ internal static class IsoBmffReader
                 case "meta":
                     ParseMeta(s, box, state);
                     break;
+                case "uuid":
+                    state.EmbeddedJpeg ??= ReadCanonThumbnail(s, box);
+                    break;
             }
         }
+    }
+
+    /// <summary>moov/uuid(Canon)/CNTH/CNDA: the JPEG thumbnail with the camera's EXIF.</summary>
+    private static byte[]? ReadCanonThumbnail(Stream s, Box uuid)
+    {
+        var id = ReadBytes(s, uuid.PayloadStart, 16);
+        if (id is null || new Guid(id, bigEndian: true) != CanonUuid) return null;
+        foreach (var cnth in Children(s, uuid.PayloadStart + 16, uuid.End))
+        {
+            if (cnth.Type != "CNTH") continue;
+            foreach (var cnda in Children(s, cnth.PayloadStart, cnth.End))
+            {
+                var length = cnda.End - cnda.PayloadStart;
+                if (cnda.Type == "CNDA" && length is > 4 and <= MaxEmbeddedJpeg)
+                    return ReadBytes(s, cnda.PayloadStart, (int)length);
+            }
+        }
+        return null;
     }
 
     private static void ParseMeta(Stream s, Box meta, State state)

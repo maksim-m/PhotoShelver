@@ -14,6 +14,9 @@ internal static class Fixtures
 
     public static string MediaRoot => Path.Combine(AppContext.BaseDirectory, "Fixtures", "media");
 
+    /// <summary>Structural replicas of real device files (invented values).</summary>
+    public static string FormatsRoot => Path.Combine(AppContext.BaseDirectory, "Fixtures", "formats");
+
     /// <summary>Copies the fixture tree into <paramref name="destination"/> and normalizes timestamps.</summary>
     public static void CopyTo(string destination)
     {

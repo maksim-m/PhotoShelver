@@ -35,10 +35,11 @@ public sealed partial class CaptureDateReader
             DateSource.FileModified);
     }
 
-    private static CaptureDate? ReadPhoto(string path)
-    {
-        var directories = ImageMetadataReader.ReadMetadata(path);
+    private static CaptureDate? ReadPhoto(string path) => ExifDate(ImageMetadataReader.ReadMetadata(path));
 
+    /// <summary>Capture date from EXIF: the camera's local clock, used as is (SPEC §3).</summary>
+    private static CaptureDate? ExifDate(IReadOnlyList<MetadataExtractor.Directory> directories)
+    {
         foreach (var dir in directories.OfType<ExifSubIfdDirectory>())
         {
             if (TryGetExifDate(dir, ExifDirectoryBase.TagDateTimeOriginal, out var d) ||
@@ -78,14 +79,29 @@ public sealed partial class CaptureDateReader
             info = info with { CreationUtc = info.CreationUtc ?? appleLocal };
         }
 
+        // 2. EXIF the camera embedded in the video (Canon): the camera's own clock, exactly like its photos,
+        //    so photos and videos of the same moment always land in the same folder.
+        if (info.EmbeddedJpeg is { } jpeg)
+        {
+            try
+            {
+                if (ExifDate(ImageMetadataReader.ReadMetadata(new MemoryStream(jpeg, writable: false))) is { } fromExif)
+                    return fromExif;
+            }
+            catch (Exception ex) when (ex is not (OutOfMemoryException or StackOverflowException or AccessViolationException))
+            {
+                // A damaged thumbnail: continue with the container's own times.
+            }
+        }
+
         if (info.CreationUtc is not { } utc) return null;
         utc = DateTime.SpecifyKind(utc, DateTimeKind.Utc);
 
-        // 2. GPS -> time zone of the shooting place.
+        // 3. GPS -> time zone of the shooting place.
         if (Iso6709.TryParse(info.Iso6709Location, out var lat, out var lon) && TryZoneFromGps(lat, lon, out var zone))
             return new CaptureDate(DateTime.SpecifyKind(TimeZoneInfo.ConvertTimeFromUtc(utc, zone), DateTimeKind.Unspecified), DateSource.Metadata);
 
-        // 3. Computer's time zone (rules at the capture date).
+        // 4. Computer's time zone (rules at the capture date).
         return new CaptureDate(DateTime.SpecifyKind(TimeZoneInfo.ConvertTimeFromUtc(utc, _localZone), DateTimeKind.Unspecified), DateSource.MetadataGuessedZone);
     }
 

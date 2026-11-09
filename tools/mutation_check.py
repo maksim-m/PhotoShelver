@@ -90,9 +90,13 @@ MUTATIONS = [
     ("files not reported to the import log", IMP,
      "onFileDone?.Invoke(new ImportFileOutcome(",
      "_ = (new ImportFileOutcome("),
+    ("Canon video EXIF ignored (UTC + PC zone instead of the camera clock)",
+     os.path.join("src", "PhotoImporter.Core", "Metadata", "IsoBmffReader.cs"),
+     "state.EmbeddedJpeg ??= ReadCanonThumbnail(s, box);",
+     ""),
     ("metadata errors not caught", CDR,
-     "catch (Exception ex) when (ex is not (OutOfMemoryException or StackOverflowException or AccessViolationException))",
-     "catch (IOException)"),
+     "catch (Exception ex) when (ex is not (OutOfMemoryException or StackOverflowException or AccessViolationException))\n        {\n            // Malformed",
+     "catch (IOException)\n        {\n            // Malformed"),
 ]
 
 UI_TESTS = os.path.join("tests", "PhotoImporter.UiTests")

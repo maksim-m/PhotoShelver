@@ -10,8 +10,9 @@ public class RobustnessTests
     public static TheoryData<string> MediaFixtures()
     {
         var data = new TheoryData<string>();
-        foreach (var f in Directory.EnumerateFiles(Fixtures.MediaRoot, "*", SearchOption.AllDirectories))
-            if (MediaTypes.TryGetKind(f, out _)) data.Add(Path.GetRelativePath(Fixtures.MediaRoot, f));
+        foreach (var root in new[] { Fixtures.MediaRoot, Fixtures.FormatsRoot })
+            foreach (var f in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
+                if (MediaTypes.TryGetKind(f, out _)) data.Add(Path.GetRelativePath(Fixtures.MediaRoot, f));
         return data;
     }
 
