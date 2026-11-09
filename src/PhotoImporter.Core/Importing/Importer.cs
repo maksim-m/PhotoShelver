@@ -125,7 +125,9 @@ public sealed class Importer
 
     private static List<string> Warnings(IEnumerable<string> cachedVolumes) =>
         cachedVolumes
-            .Select(v => $"Носитель «{v}» не поддерживает чтение в обход кэша Windows: проверка копий с него и на него слабее обычной. При перемещении исходники с такого носителя не удаляются.")
+            .Select(v => L.T(
+                $"Drive “{v}” does not support reading around the Windows cache: copies from and to it are verified less strictly. When moving, sources on it are not deleted.",
+                $"Носитель «{v}» не поддерживает чтение в обход кэша Windows: проверка копий с него и на него слабее обычной. При перемещении исходники с такого носителя не удаляются."))
             .ToList();
 
     private void ImportOne(ImportJob job, ImportMode mode, Action<long> onBytes,
@@ -133,9 +135,9 @@ public sealed class Importer
     {
         var source = new FileInfo(job.SourcePath);
         if (!source.Exists)
-            throw new FileNotFoundException("Исходный файл не найден", job.SourcePath);
+            throw new FileNotFoundException(L.T("Source file not found", "Исходный файл не найден"), job.SourcePath);
         if (SamePath(source.DirectoryName!, job.DestinationFolder))
-            throw new IOException("Файл уже находится в папке назначения");
+            throw new IOException(L.T("The file is already in the destination folder", "Файл уже находится в папке назначения"));
 
         // Snapshot to detect changes of the source while it is being copied.
         var sizeBefore = source.Length;
@@ -163,17 +165,20 @@ public sealed class Importer
         if (source.Attributes.HasFlag(FileAttributes.ReadOnly))
         {
             // Protected in the camera (or by the user): never remove that protection to delete the original.
-            failures.Add(new ImportFailure(job.SourcePath, $"Скопирован в «{dest}»; исходный файл защищён (атрибут «только чтение», например защита в камере) и не удалён"));
+            failures.Add(new ImportFailure(job.SourcePath, L.T($"Copied to “{dest}”; the source is protected (read-only attribute, e.g. protected in the camera) and was not deleted",
+                $"Скопирован в «{dest}»; исходный файл защищён (атрибут «только чтение», например защита в камере) и не удалён")));
             return;
         }
         if (!sourceReadFromDevice)
         {
-            failures.Add(new ImportFailure(job.SourcePath, $"Скопирован в «{dest}», но исходный файл не удалён: носитель не позволяет надёжно перечитать его для проверки"));
+            failures.Add(new ImportFailure(job.SourcePath, L.T($"Copied to “{dest}”, but the source was not deleted: its drive does not allow a reliable re-read for verification",
+                $"Скопирован в «{dest}», но исходный файл не удалён: носитель не позволяет надёжно перечитать его для проверки")));
             return;
         }
         if (source.Length != sizeBefore || source.LastWriteTimeUtc != writeTimeBefore)
         {
-            failures.Add(new ImportFailure(job.SourcePath, $"Скопирован в «{dest}», но исходный файл изменился во время копирования и не удалён"));
+            failures.Add(new ImportFailure(job.SourcePath, L.T($"Copied to “{dest}”, but the source changed while it was copied and was not deleted",
+                $"Скопирован в «{dest}», но исходный файл изменился во время копирования и не удалён")));
             return;
         }
         try
@@ -185,7 +190,8 @@ public sealed class Importer
         }
         catch (Exception ex) when (!IsFatal(ex))
         {
-            failures.Add(new ImportFailure(job.SourcePath, $"Скопирован в «{dest}», но не удалось завершить запись на диск, исходный файл не удалён: {ex.Message}"));
+            failures.Add(new ImportFailure(job.SourcePath, L.T($"Copied to “{dest}”, but writing to the disk could not be completed; the source was not deleted: {ex.Message}",
+                $"Скопирован в «{dest}», но не удалось завершить запись на диск, исходный файл не удалён: {ex.Message}")));
             return;
         }
         try
@@ -194,7 +200,8 @@ public sealed class Importer
         }
         catch (Exception ex) when (!IsFatal(ex))
         {
-            failures.Add(new ImportFailure(job.SourcePath, $"Скопирован в «{dest}», но исходный файл не удалён: {ex.Message}"));
+            failures.Add(new ImportFailure(job.SourcePath, L.T($"Copied to “{dest}”, but the source was not deleted: {ex.Message}",
+                $"Скопирован в «{dest}», но исходный файл не удалён: {ex.Message}")));
         }
     }
 
@@ -208,7 +215,7 @@ public sealed class Importer
         }
         catch (Exception ex) when (!IsFatal(ex))
         {
-            warnings.Add($"Не удалось снять атрибут «только чтение» с «{path}»: {ex.Message}");
+            warnings.Add(L.T($"Could not clear the read-only attribute of “{path}”: {ex.Message}", $"Не удалось снять атрибут «только чтение» с «{path}»: {ex.Message}"));
         }
     }
 
@@ -255,9 +262,11 @@ public sealed class Importer
 
             var (copyOnDisk, sourceOnDevice) = ReadBothFromDevice(temp, job.SourcePath);
             if (copyOnDisk.Hash != copiedHash)
-                throw new InvalidDataException("Копия на диске не совпадает с прочитанными данными (ошибка записи). Файл не импортирован");
+                throw new InvalidDataException(L.T("The copy on the disk does not match the data that was read (write error). The file was not imported",
+                    "Копия на диске не совпадает с прочитанными данными (ошибка записи). Файл не импортирован"));
             if (sourceOnDevice.Hash != copiedHash)
-                throw new InvalidDataException("Исходный файл при повторном чтении отличается от скопированного (нестабильное чтение или файл изменился). Файл не импортирован");
+                throw new InvalidDataException(L.T("The source reads differently from what was copied (unstable reading or the file changed). The file was not imported",
+                    "Исходный файл при повторном чтении отличается от скопированного (нестабильное чтение или файл изменился). Файл не импортирован"));
             if (!copyOnDisk.BypassedCache) cachedVolumes.Add(VolumeLabel(job.DestinationFolder));
             if (!sourceOnDevice.BypassedCache) cachedVolumes.Add(VolumeLabel(job.SourcePath));
 
@@ -375,6 +384,6 @@ public sealed class Importer
                 // Lost a race with another writer: try the next suffix.
             }
         }
-        throw new IOException($"Не удалось подобрать свободное имя для «{fileName}»");
+        throw new IOException(L.T($"Could not find a free name for “{fileName}”", $"Не удалось подобрать свободное имя для «{fileName}»"));
     }
 }

@@ -46,20 +46,20 @@ public sealed partial class FolderTemplate
         pattern = pattern?.Trim() ?? "";
         if (pattern.Length == 0)
         {
-            error = "Шаблон пустой";
+            error = L.T("The template is empty", "Шаблон пустой");
             return false;
         }
 
         if (pattern.Length > MaxLength)
         {
-            error = $"Шаблон слишком длинный (больше {MaxLength} символов)";
+            error = L.T($"The template is too long (more than {MaxLength} characters)", $"Шаблон слишком длинный (больше {MaxLength} символов)");
             return false;
         }
 
         var bad = pattern.IndexOfAny(InvalidChars);
         if (bad >= 0 || pattern.Any(char.IsControl))
         {
-            error = $"Недопустимый символ: {(bad >= 0 ? pattern[bad].ToString() : "управляющий символ")}";
+            error = L.T("Invalid character: ", "Недопустимый символ: ") + (bad >= 0 ? pattern[bad].ToString() : L.T("control character", "управляющий символ"));
             return false;
         }
 
@@ -74,7 +74,7 @@ public sealed partial class FolderTemplate
             };
             if (!ok)
             {
-                error = $"Непонятный токен «{run.Value}». Доступны: YYYY, YY, MM, MMM, DD";
+                error = L.T($"Unknown token “{run.Value}”. Available: YYYY, YY, MM, MMM, DD", $"Непонятный токен «{run.Value}». Доступны: YYYY, YY, MM, MMM, DD");
                 return false;
             }
         }
@@ -84,17 +84,17 @@ public sealed partial class FolderTemplate
         {
             if (raw.Length == 0)
             {
-                error = "Пустой уровень папки (лишний слэш)";
+                error = L.T("Empty folder level (extra slash)", "Пустой уровень папки (лишний слэш)");
                 return false;
             }
             if (raw.Trim().Length == 0 || raw == "." || raw == "..")
             {
-                error = $"Недопустимое имя папки: «{raw}»";
+                error = L.T($"Invalid folder name: “{raw}”", $"Недопустимое имя папки: «{raw}»");
                 return false;
             }
             if (raw.EndsWith('.') || raw.EndsWith(' ') || raw.StartsWith(' '))
             {
-                error = "Имя папки не может начинаться с пробела или заканчиваться пробелом или точкой";
+                error = L.T("A folder name cannot start with a space or end with a space or a dot", "Имя папки не может начинаться с пробела или заканчиваться пробелом или точкой");
                 return false;
             }
             segments.Add(Tokenize(raw));
@@ -104,8 +104,8 @@ public sealed partial class FolderTemplate
         if (kinds.Count == 0)
         {
             error = LowercaseTokens().IsMatch(pattern)
-                ? "Токены пишутся заглавными буквами: YYYY, YY, MM, MMM, DD"
-                : "В шаблоне нет даты. Добавьте хотя бы один токен: YYYY, YY, MM, MMM, DD";
+                ? L.T("Tokens are written in capitals: YYYY, YY, MM, MMM, DD", "Токены пишутся заглавными буквами: YYYY, YY, MM, MMM, DD")
+                : L.T("The template has no date. Add at least one token: YYYY, YY, MM, MMM, DD", "В шаблоне нет даты. Добавьте хотя бы один токен: YYYY, YY, MM, MMM, DD");
             return false;
         }
 
@@ -114,7 +114,7 @@ public sealed partial class FolderTemplate
         {
             if (ReservedNames.Contains(name) || ReservedNames.Contains(Path.GetFileNameWithoutExtension(name)))
             {
-                error = $"Зарезервированное имя Windows: «{name}»";
+                error = L.T($"Reserved Windows name: “{name}”", $"Зарезервированное имя Windows: «{name}»");
                 return false;
             }
         }
@@ -122,9 +122,9 @@ public sealed partial class FolderTemplate
         var hasYear = kinds.Contains(TokenKind.Year4) || kinds.Contains(TokenKind.Year2);
         var hasMonth = kinds.Contains(TokenKind.Month) || kinds.Contains(TokenKind.MonthName);
         if (kinds.Contains(TokenKind.Day) && !hasMonth)
-            candidate.Warning = "Нет месяца (MM или MMM): в одну папку попадут файлы одного числа разных месяцев";
+            candidate.Warning = L.T("No month (MM or MMM): files from the same day of different months share a folder", "Нет месяца (MM или MMM): в одну папку попадут файлы одного числа разных месяцев");
         else if (hasMonth && !hasYear)
-            candidate.Warning = "Нет года (YYYY или YY): в одну папку попадут файлы одного месяца разных лет";
+            candidate.Warning = L.T("No year (YYYY or YY): files from the same month of different years share a folder", "Нет года (YYYY или YY): в одну папку попадут файлы одного месяца разных лет");
 
         template = candidate;
         return true;

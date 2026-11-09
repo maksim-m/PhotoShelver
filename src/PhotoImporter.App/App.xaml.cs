@@ -1,3 +1,4 @@
+using PhotoImporter.Core;
 using System.Windows;
 using System.Windows.Threading;
 
@@ -10,6 +11,9 @@ public partial class App : Application
 
     protected override void OnStartup(StartupEventArgs e)
     {
+        // Language: Windows' display language; PHOTOIMPORTER_LANG=ru|en overrides it (tests, screenshots).
+        L.Override(Environment.GetEnvironmentVariable("PHOTOIMPORTER_LANG"));
+
         // A UI glitch must not kill the app (an import may be running in the background).
         DispatcherUnhandledException += OnDispatcherUnhandledException;
         AppDomain.CurrentDomain.UnhandledException += (_, args) => Log(args.ExceptionObject as Exception);
@@ -22,7 +26,8 @@ public partial class App : Application
         Log(e.Exception);
         e.Handled = true;
         MessageBox.Show(
-            $"Произошла непредвиденная ошибка интерфейса. Приложение продолжит работу.\n\n{e.Exception.Message}\n\nПодробности: {LogPath}",
+            L.T($"An unexpected interface error occurred. The app keeps running.\n\n{e.Exception.Message}\n\nDetails: {LogPath}",
+                $"Произошла непредвиденная ошибка интерфейса. Приложение продолжит работу.\n\n{e.Exception.Message}\n\nПодробности: {LogPath}"),
             "PhotoImporter", MessageBoxButton.OK, MessageBoxImage.Warning);
     }
 

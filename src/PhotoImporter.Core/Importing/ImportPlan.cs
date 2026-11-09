@@ -9,13 +9,13 @@ public static class ImportPlan
     public static string DestinationFolder(string targetRoot, FolderTemplate template, SourceFile file)
     {
         if (file.Date is not { } date)
-            throw new InvalidOperationException($"Нет даты для файла {file.Path}");
+            throw new InvalidOperationException(L.T($"No date for file {file.Path}", $"Нет даты для файла {file.Path}"));
         var root = PathUtil.WithTrailingSeparator(targetRoot); // "E:\" and "E:\Photos\" alike
         var folder = Path.GetFullPath(Path.Combine(root, template.Format(date.Local)));
 
         // Defence in depth: a validated template can never leave the target root.
         if (!folder.StartsWith(root, StringComparison.OrdinalIgnoreCase) || folder.Length <= root.Length)
-            throw new InvalidOperationException($"Папка «{folder}» вне папки-цели");
+            throw new InvalidOperationException(L.T($"Folder “{folder}” is outside the target folder", $"Папка «{folder}» вне папки-цели"));
         return folder;
     }
 

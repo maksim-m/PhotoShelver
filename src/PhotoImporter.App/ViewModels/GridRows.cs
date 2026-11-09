@@ -1,3 +1,4 @@
+using PhotoImporter.Core;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace PhotoImporter.App.ViewModels;
@@ -33,7 +34,7 @@ public sealed partial class HeaderRow : GridRow
         get
         {
             var selected = Items.Count(i => i.IsSelected && i.CanBeImported);
-            return $"{Format.Files(Items.Count)} · выбрано {selected}";
+            return $"{Format.Files(Items.Count)} · {L.T("selected", "выбрано")} {selected}";
         }
     }
 
@@ -71,8 +72,8 @@ public sealed partial class HeaderRow : GridRow
     public bool CanToggleSelection => Items.Any(i => i.IsNew || i.IsSelected);
 
     public string SelectionTip => Items.Any(i => i.IsNew)
-        ? "Выбрать все новые файлы этого дня / снять выбор"
-        : "В этом дне нет новых файлов";
+        ? L.T("Select all new files of this day / clear the selection", "Выбрать все новые файлы этого дня / снять выбор")
+        : L.T("No new files on this day", "В этом дне нет новых файлов");
 
     public void RefreshCounts()
     {

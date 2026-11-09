@@ -69,6 +69,7 @@ public sealed class AppSession : IDisposable
         }));
 
         var start = new ProcessStartInfo(ExePath) { UseShellExecute = false };
+        start.Environment["PHOTOIMPORTER_LANG"] = "ru"; // the tests check Russian texts unless they pass another language
         foreach (var (key, value) in environment ?? new Dictionary<string, string>()) start.Environment[key] = value;
         start.Environment["PHOTOIMPORTER_SETTINGS"] = SettingsPath; // SAFETY: the user's settings are never used
         _process = Process.Start(start) ?? throw new InvalidOperationException("could not start the app");
@@ -199,10 +200,10 @@ public sealed class AppSession : IDisposable
         {
             var texts = Window.FindAll(TreeScope.Descendants, new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Text))
                 .Cast<AutomationElement>().Select(e => e.Current.Name).ToList();
-            return texts.Any(t => t.StartsWith("Всего", StringComparison.Ordinal))
-                   && !texts.Any(t => t.StartsWith("Чтение метаданных", StringComparison.Ordinal)
-                                      || t.StartsWith("Проверка дубликатов", StringComparison.Ordinal)
-                                      || t.StartsWith("Поиск файлов", StringComparison.Ordinal));
+            // Russian and English texts (a test may run the app in either language).
+            string[] busy = ["Чтение метаданных", "Проверка дубликатов", "Поиск файлов", "Reading metadata", "Checking for duplicates", "Looking for files"];
+            return texts.Any(t => t.StartsWith("Всего", StringComparison.Ordinal) || t.StartsWith("Total", StringComparison.Ordinal))
+                   && !texts.Any(t => busy.Any(b => t.StartsWith(b, StringComparison.Ordinal)));
         }, "scan and duplicate check to finish");
         Thread.Sleep(300); // let the debounced refresh (counters, tree) settle
     }

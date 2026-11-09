@@ -36,7 +36,7 @@ public static partial class ImportLeftovers
         {
             if (!IsLeftover(Path.GetFileName(path)))
             {
-                failed.Add((path, "Не временный файл импорта — не удаляется"));
+                failed.Add((path, L.T("Not an import temp file — not deleted", "Не временный файл импорта — не удаляется")));
                 continue;
             }
             try

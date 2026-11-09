@@ -52,14 +52,14 @@
                 <StackPanel.ContextMenu>
                     <!-- A context menu lives outside the window's visual tree: reach the window's view model via Tag. -->
                     <ContextMenu>
-                        <MenuItem Header="Открыть" AutomationProperties.AutomationId="TileOpen" FontWeight="SemiBold"
+                        <MenuItem Header="{x:Static local:Ui.Open}" AutomationProperties.AutomationId="TileOpen" FontWeight="SemiBold"
                                   Command="{Binding PlacementTarget.Tag.OpenFileCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                   CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
                             <MenuItem.Icon>
                                 <TextBlock Text="&#xE8E5;" FontFamily="{StaticResource IconFont}"/>
                             </MenuItem.Icon>
                         </MenuItem>
-                        <MenuItem Header="Показать в папке" AutomationProperties.AutomationId="TileReveal"
+                        <MenuItem Header="{x:Static local:Ui.ShowInFolder}" AutomationProperties.AutomationId="TileReveal"
                                   Command="{Binding PlacementTarget.Tag.ShowInFolderCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                   CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
                             <MenuItem.Icon>
@@ -86,7 +86,7 @@
                         <!-- Uniform: the whole picture is visible, portrait shots are not cropped -->
                         <Image Source="{Binding Thumbnail}" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
                         <CheckBox AutomationProperties.AutomationId="TileCheck" AutomationProperties.Name="{Binding FileName}" IsChecked="{Binding IsSelected}" IsEnabled="{Binding CanBeImported}" MinWidth="0" Padding="0"
-                                  Margin="6" HorizontalAlignment="Left" VerticalAlignment="Top" ToolTip="Импортировать этот файл"/>
+                                  Margin="6" HorizontalAlignment="Left" VerticalAlignment="Top" ToolTip="{x:Static local:Ui.ImportThisFile}"/>
                         <Border Style="{StaticResource Badge}" HorizontalAlignment="Right" VerticalAlignment="Bottom"
                                 Visibility="{Binding IsVideo, Converter={StaticResource BoolToVis}}">
                             <TextBlock Text="&#xE714;" Style="{StaticResource BadgeIcon}"/>
@@ -135,10 +135,10 @@
                 <CheckBox DockPanel.Dock="Left" MinWidth="0" Padding="0" Margin="0,0,10,0" VerticalAlignment="Center"
                           IsChecked="{Binding GroupSelection, Mode=TwoWay}" IsEnabled="{Binding CanToggleSelection}"
                           ToolTip="{Binding SelectionTip}" ToolTipService.ShowOnDisabled="True"
-                          AutomationProperties.HelpText="Выбор дня" AutomationProperties.AutomationId="DayCheck" AutomationProperties.Name="{Binding Title}"/>
+                          AutomationProperties.HelpText="{x:Static local:Ui.DaySelection}" AutomationProperties.AutomationId="DayCheck" AutomationProperties.Name="{Binding Title}"/>
                 <Button Style="{StaticResource GroupHeaderButton}" Margin="-6,0,0,0" AutomationProperties.AutomationId="DayHeader" AutomationProperties.Name="{Binding Title}"
                         Command="{Binding DataContext.ToggleGroupCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                        CommandParameter="{Binding}" ToolTip="Свернуть или развернуть">
+                        CommandParameter="{Binding}" ToolTip="{x:Static local:Ui.CollapseOrExpand}">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock x:Name="Chevron" Text="&#xE70D;" FontFamily="{StaticResource IconFont}" FontSize="12"
                                    VerticalAlignment="Center" Margin="0,2,10,0" Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
@@ -182,28 +182,28 @@
         <!-- ================= Source ================= -->
         <Border Style="{StaticResource Card}">
             <DockPanel>
-                <TextBlock DockPanel.Dock="Top" Text="Источник" Style="{StaticResource Header}"/>
+                <TextBlock DockPanel.Dock="Top" Text="{x:Static local:Ui.Source}" Style="{StaticResource Header}"/>
                 <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
-                    <Button DockPanel.Dock="Right" Content="Выбрать…" Margin="8,0,0,0" Padding="12,5" Command="{Binding BrowseSourceCommand}"/>
+                    <Button DockPanel.Dock="Right" Content="{x:Static local:Ui.Browse}" Margin="8,0,0,0" Padding="12,5" Command="{Binding BrowseSourceCommand}"/>
                     <TextBox Text="{Binding SourcePath, Mode=OneWay}" IsReadOnly="True" VerticalContentAlignment="Center"/>
                 </DockPanel>
                 <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center"
                                 Visibility="{Binding HasGroups, Converter={StaticResource BoolToVis}}">
-                        <Button AutomationProperties.AutomationId="CollapseAll" AutomationProperties.Name="Свернуть все" Command="{Binding CollapseAllCommand}" Padding="8,3" Margin="0,0,6,0" ToolTip="Свернуть все дни">
+                        <Button AutomationProperties.AutomationId="CollapseAll" AutomationProperties.Name="{x:Static local:Ui.CollapseAll}" Command="{Binding CollapseAllCommand}" Padding="8,3" Margin="0,0,6,0" ToolTip="{x:Static local:Ui.CollapseAllTip}">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="&#xE76C;" FontFamily="{StaticResource IconFont}" FontSize="10" VerticalAlignment="Center" Margin="0,1,6,0"/>
-                                <TextBlock Text="Свернуть все" FontSize="12"/>
+                                <TextBlock Text="{x:Static local:Ui.CollapseAll}" FontSize="12"/>
                             </StackPanel>
                         </Button>
-                        <Button AutomationProperties.AutomationId="ExpandAll" AutomationProperties.Name="Развернуть все" Command="{Binding ExpandAllCommand}" Padding="8,3" ToolTip="Развернуть все дни">
+                        <Button AutomationProperties.AutomationId="ExpandAll" AutomationProperties.Name="{x:Static local:Ui.ExpandAll}" Command="{Binding ExpandAllCommand}" Padding="8,3" ToolTip="{x:Static local:Ui.ExpandAllTip}">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="&#xE70D;" FontFamily="{StaticResource IconFont}" FontSize="10" VerticalAlignment="Center" Margin="0,1,6,0"/>
-                                <TextBlock Text="Развернуть все" FontSize="12"/>
+                                <TextBlock Text="{x:Static local:Ui.ExpandAll}" FontSize="12"/>
                             </StackPanel>
                         </Button>
                     </StackPanel>
-                    <CheckBox Content="Включая подпапки" IsChecked="{Binding IncludeSubfolders}"
+                    <CheckBox Content="{x:Static local:Ui.IncludeSubfolders}" IsChecked="{Binding IncludeSubfolders}"
                               IsEnabled="{Binding IsIdle}" HorizontalAlignment="Left" VerticalAlignment="Center"/>
                 </DockPanel>
 
@@ -214,8 +214,8 @@
                     </StackPanel>
                     <DockPanel>
                         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-                            <Button AutomationProperties.AutomationId="SelectAllNew" Content="Выбрать все новые" Padding="12,5" Margin="8,0,8,0" Command="{Binding SelectAllNewCommand}" IsEnabled="{Binding IsIdle}"/>
-                            <Button AutomationProperties.AutomationId="SelectNone" Content="Снять все" Padding="12,5" Command="{Binding SelectNoneCommand}" IsEnabled="{Binding IsIdle}"/>
+                            <Button AutomationProperties.AutomationId="SelectAllNew" Content="{x:Static local:Ui.SelectAllNew}" Padding="12,5" Margin="8,0,8,0" Command="{Binding SelectAllNewCommand}" IsEnabled="{Binding IsIdle}"/>
+                            <Button AutomationProperties.AutomationId="SelectNone" Content="{x:Static local:Ui.SelectNone}" Padding="12,5" Command="{Binding SelectNoneCommand}" IsEnabled="{Binding IsIdle}"/>
                         </StackPanel>
                         <StackPanel VerticalAlignment="Center">
                             <TextBlock AutomationProperties.AutomationId="Summary" Text="{Binding SummaryText}" TextWrapping="Wrap"/>
@@ -262,16 +262,16 @@
         <!-- ================= Target ================= -->
         <Border Grid.Column="2" Style="{StaticResource Card}">
             <DockPanel>
-                <TextBlock DockPanel.Dock="Top" Text="Цель" Style="{StaticResource Header}"/>
+                <TextBlock DockPanel.Dock="Top" Text="{x:Static local:Ui.Target}" Style="{StaticResource Header}"/>
                 <DockPanel DockPanel.Dock="Top" Margin="0,0,0,12">
-                    <Button DockPanel.Dock="Right" Content="Выбрать…" Margin="8,0,0,0" Padding="12,5" Command="{Binding BrowseTargetCommand}"/>
+                    <Button DockPanel.Dock="Right" Content="{x:Static local:Ui.Browse}" Margin="8,0,0,0" Padding="12,5" Command="{Binding BrowseTargetCommand}"/>
                     <TextBox Text="{Binding TargetPath, Mode=OneWay}" IsReadOnly="True" VerticalContentAlignment="Center"/>
                 </DockPanel>
-                <TextBlock DockPanel.Dock="Top" Text="Шаблон папок" Margin="0,0,0,4"/>
+                <TextBlock DockPanel.Dock="Top" Text="{x:Static local:Ui.FolderTemplate}" Margin="0,0,0,4"/>
                 <ComboBox AutomationProperties.AutomationId="Template" DockPanel.Dock="Top" IsEditable="True" IsTextSearchEnabled="False" TextSearch.TextPath="Pattern" IsEnabled="{Binding IsIdle}"
                           ItemsSource="{Binding TemplatePresets}"
                           Text="{Binding TemplateText, UpdateSourceTrigger=PropertyChanged}"
-                          ToolTip="Выберите вариант или введите свой. YYYY — год, YY — год (2 цифры), MM — месяц, MMM — месяц (Jan…Dec), DD — день, / — вложенная папка">
+                          ToolTip="{x:Static local:Ui.TemplateTip}">
                     <ComboBox.ItemTemplate>
                         <DataTemplate>
                             <DockPanel MinWidth="260">
@@ -290,9 +290,9 @@
                                Foreground="{DynamicResource SystemFillColorCautionBrush}"/>
                     <TextBlock AutomationProperties.AutomationId="TemplateWarning" Text="{Binding TemplateWarning}" TextWrapping="Wrap"/>
                 </DockPanel>
-                <TextBlock DockPanel.Dock="Top" Text="YYYY · YY · MM · MMM · DD · / — новый уровень" Style="{StaticResource Secondary}" FontSize="12" Margin="0,2,0,12"/>
+                <TextBlock DockPanel.Dock="Top" Text="{x:Static local:Ui.TemplateLegend}" Style="{StaticResource Secondary}" FontSize="12" Margin="0,2,0,12"/>
 
-                <CheckBox AutomationProperties.AutomationId="ShowFullTree" DockPanel.Dock="Bottom" Content="Показать всё дерево" IsChecked="{Binding ShowFullTree}" Margin="0,12,0,0" HorizontalAlignment="Left"/>
+                <CheckBox AutomationProperties.AutomationId="ShowFullTree" DockPanel.Dock="Bottom" Content="{x:Static local:Ui.ShowFullTree}" IsChecked="{Binding ShowFullTree}" Margin="0,12,0,0" HorizontalAlignment="Left"/>
                 <Border DockPanel.Dock="Bottom" Margin="0,12,0,0" Padding="12,8" CornerRadius="6"
                         Background="{DynamicResource SystemFillColorCautionBackgroundBrush}"
                         Visibility="{Binding LeftoversText, Converter={StaticResource NotNullToVis}}">
@@ -303,8 +303,8 @@
                             <TextBlock AutomationProperties.AutomationId="Leftovers" Text="{Binding LeftoversText}" TextWrapping="Wrap"/>
                         </DockPanel>
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
-                            <Button Content="Показать" Padding="12,4" Margin="0,0,8,0" Command="{Binding ShowLeftoversCommand}"/>
-                            <Button AutomationProperties.AutomationId="DeleteLeftovers" Content="Удалить" Padding="12,4" Command="{Binding DeleteLeftoversCommand}"/>
+                            <Button Content="{x:Static local:Ui.Show}" Padding="12,4" Margin="0,0,8,0" Command="{Binding ShowLeftoversCommand}"/>
+                            <Button AutomationProperties.AutomationId="DeleteLeftovers" Content="{x:Static local:Ui.Delete}" Padding="12,4" Command="{Binding DeleteLeftoversCommand}"/>
                         </StackPanel>
                     </StackPanel>
                 </Border>
@@ -349,7 +349,7 @@
             <DockPanel>
                 <TextBlock DockPanel.Dock="Left" Text="&#xE7BA;" FontFamily="{StaticResource IconFont}" FontSize="16"
                            Foreground="{DynamicResource SystemFillColorCautionBrush}" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                <Button AutomationProperties.AutomationId="SwitchToCopy" DockPanel.Dock="Right" Content="Копировать вместо перемещения" Padding="12,4" Command="{Binding SwitchToCopyCommand}"
+                <Button AutomationProperties.AutomationId="SwitchToCopy" DockPanel.Dock="Right" Content="{x:Static local:Ui.SwitchToCopy}" Padding="12,4" Command="{Binding SwitchToCopyCommand}"
                         Visibility="{Binding NoticeHasAction, Converter={StaticResource BoolToVis}}"/>
                 <TextBlock AutomationProperties.AutomationId="Notice" Text="{Binding DisplayNotice}" TextWrapping="Wrap" VerticalAlignment="Center"/>
             </DockPanel>
@@ -358,12 +358,12 @@
         <!-- ================= Bottom bar ================= -->
         <DockPanel Grid.Row="2" Grid.ColumnSpan="3" Margin="0,16,0,0">
             <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center" IsEnabled="{Binding IsIdle}">
-                <RadioButton AutomationProperties.AutomationId="ModeMove" Content="Переместить" IsChecked="{Binding IsMoveMode}" Margin="0,0,16,0" GroupName="Mode"/>
-                <RadioButton AutomationProperties.AutomationId="ModeCopy" Content="Копировать" IsChecked="{Binding IsCopyMode}" GroupName="Mode"/>
+                <RadioButton AutomationProperties.AutomationId="ModeMove" Content="{x:Static local:Ui.Move}" IsChecked="{Binding IsMoveMode}" Margin="0,0,16,0" GroupName="Mode"/>
+                <RadioButton AutomationProperties.AutomationId="ModeCopy" Content="{x:Static local:Ui.Copy}" IsChecked="{Binding IsCopyMode}" GroupName="Mode"/>
             </StackPanel>
-            <Button AutomationProperties.AutomationId="Import" DockPanel.Dock="Right" Content="Импорт" Padding="32,6" Margin="12,0,0,0" FontWeight="SemiBold"
+            <Button AutomationProperties.AutomationId="Import" DockPanel.Dock="Right" Content="{x:Static local:Ui.Import}" Padding="32,6" Margin="12,0,0,0" FontWeight="SemiBold"
                     Style="{DynamicResource AccentButtonStyle}" Command="{Binding ImportCommand}"/>
-            <Button AutomationProperties.AutomationId="CancelImport" DockPanel.Dock="Right" Content="Отмена" Padding="16,6" Margin="12,0,0,0" Command="{Binding CancelImportCommand}"
+            <Button AutomationProperties.AutomationId="CancelImport" DockPanel.Dock="Right" Content="{x:Static local:Ui.Cancel}" Padding="16,6" Margin="12,0,0,0" Command="{Binding CancelImportCommand}"
                     Visibility="{Binding IsImporting, Converter={StaticResource BoolToVis}}"/>
             <StackPanel VerticalAlignment="Center" Margin="32,0,0,0" Visibility="{Binding IsImporting, Converter={StaticResource BoolToVis}}">
                 <TextBlock AutomationProperties.AutomationId="ImportStatus" Text="{Binding ImportStatus}" Style="{StaticResource Secondary}" Margin="0,0,0,4"/>

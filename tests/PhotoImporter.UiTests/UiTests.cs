@@ -124,6 +124,24 @@ public class UiTests
             Assert.Equal(cardBefore.Files[file], library.Files[Path.Combine(folder, Path.GetFileName(file))]);
     }
 
+    [UiFact]
+    public async Task EnglishInterfaceImportsTheSameWay()
+    {
+        using var ws = new Workspace();
+        var expected = await ExpectedFolders(ws.Card, ws.Library);
+
+        using var app = new AppSession(new UiSettings(ws.Card, ws.Library, MoveMode: false), ws.Root,
+            new Dictionary<string, string> { ["PHOTOIMPORTER_LANG"] = "en" });
+        app.WaitReady();
+        var dialog = app.RunImport();
+
+        Assert.Equal("Import finished", dialog.Headline);
+        Assert.Contains("Imported: 16 files", dialog.Details);
+        var library = Snapshot.Take(ws.Library);
+        foreach (var (file, folder) in expected.Where(e => e.Key != @"photos\sub\IMG_0001_copy.JPG"))
+            Assert.True(library.Files.ContainsKey(Path.Combine(folder, Path.GetFileName(file))), file);
+    }
+
     // ------------------------------------------------------------------ duplicate check
 
     [UiFact]

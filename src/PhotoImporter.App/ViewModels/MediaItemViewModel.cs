@@ -91,11 +91,11 @@ public sealed partial class MediaItemViewModel : ObservableObject
         };
 
     public string? StatusTip =>
-        HasError ? $"Ошибка чтения: {File.Error}"
+        HasError ? L.T($"Read error: {File.Error}", $"Ошибка чтения: {File.Error}")
         : File.Date?.Source switch
         {
-            DateSource.FileModified => "В метаданных нет даты съёмки — использована дата изменения файла",
-            DateSource.MetadataGuessedZone => "Часовой пояс съёмки неизвестен — использован пояс этого компьютера",
+            DateSource.FileModified => L.T("No capture date in the metadata — the file modification date is used", "В метаданных нет даты съёмки — использована дата изменения файла"),
+            DateSource.MetadataGuessedZone => L.T("The capture time zone is unknown — this computer's time zone is used", "Часовой пояс съёмки неизвестен — использован пояс этого компьютера"),
             _ => null,
         };
 
@@ -111,10 +111,10 @@ public sealed partial class MediaItemViewModel : ObservableObject
             switch (Duplicate)
             {
                 case { State: DuplicateState.InTarget, OtherPath: var p }:
-                    sb.AppendLine().Append("Уже импортирован: ").Append(p);
+                    sb.AppendLine().Append(L.T("Already imported: ", "Уже импортирован: ")).Append(p);
                     break;
                 case { State: DuplicateState.DuplicateInSource, OtherPath: var p }:
-                    sb.AppendLine().Append("Дубликат файла в источнике: ").Append(p);
+                    sb.AppendLine().Append(L.T("Duplicate of a source file: ", "Дубликат файла в источнике: ")).Append(p);
                     break;
             }
             return sb.ToString();

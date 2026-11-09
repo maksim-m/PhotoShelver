@@ -1,67 +1,75 @@
 # PhotoImporter
 
-Импорт фото и видео в библиотеку с раскладкой по папкам по дате съёмки (в духе импорта Lightroom). Windows 11, .NET 10, WPF со встроенной Fluent-темой.
+**Move photos and videos from a memory card or phone into your library, sorted into folders by capture date — without ever losing or overwriting a file.**
 
-Поведение описано в [SPEC.md](SPEC.md).
+A small, focused Windows 11 app in the spirit of Lightroom's Import dialog, without the catalog: your library stays plain folders that any program can read.
 
-## Возможности
+![PhotoImporter: the source on the left, the target folder tree on the right](docs/screenshot.png)
 
-- Источник: превью (системные эскизы Windows), группировка по дням, галочки на каждом файле.
-- Дубликаты по содержимому (xxHash128): уже импортированные и повторяющиеся в источнике файлы показываются полупрозрачными и по умолчанию не выбраны.
-- Цель: шаблон папок (`YYYY/YYYY-MM-DD` по умолчанию) и дерево-предпросмотр: новые папки помечены **NEW**, у каждой папки число файлов.
-- Дата съёмки: EXIF для фото. Для MP4/MOV — дата Apple со смещением, иначе UTC + часовой пояс по GPS, иначе пояс компьютера. Если метаданных нет, берётся дата изменения файла.
-- Перемещение (по умолчанию) или копирование. Ничего не перезаписывается: при совпадении имён добавляется `_1`, `_2`, … При перемещении на другой диск копия сверяется по хешу до удаления исходника.
+## Why
 
-## Сборка
+Copying a card by hand in Explorer is tedious and error-prone: you sort files into dated folders yourself, re-import the same shots because the card was never cleared, and Explorer's copy never checks that what landed on the disk is what was on the card. Full photo managers solve this, but pull you into their catalog and their way of working.
 
-Нужен .NET 10 SDK.
+PhotoImporter does one job:
 
-```powershell
-dotnet build
-dotnet test
-dotnet run --project src/PhotoImporter.App
-```
+1. **Pick the source** (a card, a phone folder, a download folder) — you see every photo and video as a thumbnail, grouped by day.
+2. **Pick the target** (your photo library) — you see the folder tree it will create, with the number of files going into every folder and **NEW** on folders that do not exist yet.
+3. **Press Import.** Files are moved (or copied) into `2026/2026-08-14`-style folders, verified, and logged.
 
-### Мутационная проверка тестов
+## Highlights
 
-```powershell
-python tools/mutation_check.py
-```
+- **Sorted by the real capture date.** EXIF for photos; for videos the camera's own clock (Canon), Apple's date with time zone, or the GPS position's time zone — so photos and videos from one moment land in the same folder. Files without metadata fall back to the modification date (and are marked).
+- **Duplicates are recognised by content.** Files that are already in the library (from an earlier import) or appear twice on the card are dimmed and not selected — detected by a 128-bit content hash, not by name.
+- **Your folder scheme.** `YYYY/YYYY-MM-DD` by default, or any template with `YYYY`, `YY`, `MM`, `MMM`, `DD` and `/`; mistakes are explained as you type.
+- **RAW-friendly.** Thumbnails for CR2, CR3, NEF, ARW, DNG, RAF, ORF, RW2 come from the preview the camera embedded — fast and without installing codecs. TIFF scans are shown upright.
+- **Fast on big cards.** Thousands of files are scanned in seconds; thumbnails load for what is on screen first.
+- **Native look.** Windows 11 Fluent design, light and dark theme, English and Russian interface (follows the Windows display language).
+- **One file, nothing to install.** A self-contained `PhotoImporter.exe`; the .NET runtime is inside.
 
-Скрипт по очереди ломает опасные места импортёра: перезапись, удаление исходника, сверку хеша и т.п. После каждой поломки он прогоняет тесты и возвращает код на место. Если какая-то поломка не уронила ни одного теста, она помечается как `NOT CAUGHT`: это пробел в тестах. Если код изменился и фрагмент для поломки больше не находится, скрипт останавливается с ошибкой. Тогда нужно обновить фрагмент в скрипте.
+## Safety first
 
-Тестовые фикстуры (`tests/PhotoImporter.Core.Tests/Fixtures/media`) синтетические, их пересоздаёт `generate_fixtures.py` (нужен Pillow).
+Your photos are irreplaceable, so the importer is built around a few hard rules:
 
-### Тесты интерфейса
+- **Nothing is ever overwritten.** A name clash gets a suffix: `IMG_0001_1.JPG`, `IMG_0001_2.JPG`, …
+- **Every copy is verified before it counts.** The copy is read back from the disk bypassing the Windows cache and compared with the data that was read; the source is re-read from the card as well, which catches flaky card readers and cables.
+- **A source is deleted only after its copy is verified and committed to the disk** — a power cut or a crash can never leave you with neither file. Write-protected cards and files protected in the camera are never deleted.
+- **Files are copied under a temporary name** (`*.importing`) and get their real name only when complete, so an interrupted import never leaves a half-written photo looking like a real one.
+- **Every import is logged** — which file went where, with its hash — in `%LOCALAPPDATA%\PhotoImporter\logs`.
 
-```powershell
-powershell -ExecutionPolicy Bypass -File tools/run_ui_tests.ps1
-```
+These rules are enforced by tests that inject failures (full disk, card removed mid-copy, file changing while it is copied, bit rot after writing, sharing violations), by tests on real exFAT volumes, by end-to-end UI tests, and by a mutation check that deliberately breaks each safety rule and makes sure some test notices. The full behaviour is specified in [SPEC.md](SPEC.md) (Russian).
 
-Сквозные сценарии через настоящее окно приложения (`tests/PhotoImporter.UiTests`): импорт с перемещением и копированием, уже импортированные файлы и совпадения имён, цель, появившаяся позже, ошибки шаблона, галочки дня и кнопки выбора, сворачивание дней, остатки `.importing`, вложенные папки, сохранение настроек, двойной клик и контекстное меню плитки (настоящей мышью), отмена импорта посреди процесса и попытка закрыть окно во время импорта (на ~1,5 ГБ временных файлов). Перемещение с защищённой от записи карты через окно проверяется в `tools/run_real_volume_tests.ps1`. Каждый тест работает с копией тестовых файлов во временной папке и с отдельным файлом настроек — ваши настройки и папки не затрагиваются. Во время прогона (~1 мин) на экране появляются и закрываются окна — не трогайте мышь и клавиатуру. Обычный `dotnet test` эти тесты пропускает. Мутационная проверка интерфейса: `python tools/mutation_check.py --ui`.
+## Getting it
 
-### Проверка на реальных носителях
-
-```powershell
-powershell -ExecutionPolicy Bypass -File tools/run_real_volume_tests.ps1
-```
-
-Создаёт два временных виртуальных диска exFAT (как SD-карта): обычный и только для чтения с тестовыми файлами. Прогоняет на них тесты `Category=RealVolume` и удаляет диски. Нужны права администратора, будет запрос UAC. Для настоящей карты или USB-диска задайте `PHOTOIMPORTER_TEST_VOLUME` (подробности в начале `RealVolumeTests.cs`).
-
-## Готовый exe
+Requires Windows 11 (x64). Build it with the [.NET 10 SDK](https://dotnet.microsoft.com/download):
 
 ```powershell
 dotnet publish src/PhotoImporter.App -c Release -o publish
 ```
 
-Получается один файл `publish\PhotoImporter.exe` (~66 МБ, runtime внутри). Пользователю ничего устанавливать не нужно.
+This produces a single `publish\PhotoImporter.exe` (~66 MB, runtime included) that runs without installing anything.
 
-Настройки (последние папки, шаблон, режим) хранятся в `%LOCALAPPDATA%\PhotoImporter\settings.json`, журналы импорта — в `%LOCALAPPDATA%\PhotoImporter\logs`.
+Settings (last folders, template, mode) are kept in `%LOCALAPPDATA%\PhotoImporter\settings.json`.
 
-Иконка (`src/PhotoImporter.App/Assets/app.ico`) рисуется скриптом `python tools/make_icon.py` (нужен Pillow).
+## Development
 
-## Структура
+```powershell
+dotnet build
+dotnet test                       # core tests (xUnit)
+dotnet run --project src/PhotoImporter.App
+```
 
-- `src/PhotoImporter.Core`: логика без UI (сканирование, даты, хеши, дубликаты, дерево, импорт).
-- `src/PhotoImporter.App`: WPF-приложение.
-- `tests/PhotoImporter.Core.Tests`: тесты ядра (xUnit).
+- **UI tests** — real window, real mouse; about a minute, don't touch the mouse meanwhile:
+  `powershell -ExecutionPolicy Bypass -File tools/run_ui_tests.ps1`
+- **Real volumes** — creates temporary exFAT virtual disks (one write-protected, like a locked SD card), runs the `RealVolume` tests and removes the disks; asks for administrator rights:
+  `powershell -ExecutionPolicy Bypass -File tools/run_real_volume_tests.ps1`
+- **Mutation check** — breaks each safety rule in turn and expects a failing test: `python tools/mutation_check.py` (add `--ui` for the interface).
+- **Test files** are synthetic (`tests/PhotoImporter.Core.Tests/Fixtures`, generated by `generate_fixtures.py`); format replicas of camera and phone files use the real structure with invented values.
+- **Language**: Windows' display language decides (Russian → Russian, anything else → English); `PHOTOIMPORTER_LANG=ru|en` overrides it. Texts live next to the code: `L.T("English", "Русский")`.
+- **Screenshot**: the demo card and library are drawn by `python tools/make_demo_library.py <empty folder>`.
+
+### Layout
+
+- `src/PhotoImporter.Core` — everything without UI: scanning, capture dates, hashing, duplicates, folder tree, import.
+- `src/PhotoImporter.App` — the WPF app.
+- `tests/` — core tests and UI tests.
+- `tools/` — test runners, mutation check, icon and demo generators.

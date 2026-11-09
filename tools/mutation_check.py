@@ -141,8 +141,8 @@ UI_MUTATIONS = [
      "if (answer != System.Windows.MessageBoxResult.Yes) return;",
      ""),
     ("Cancel button does nothing", VM,
-     '_importCts?.Cancel();\n        ImportStatus = "Отмена',
-     '\n        ImportStatus = "Отмена'),
+     '_importCts?.Cancel();\n        ImportStatus = L.T("Cancelling',
+     '\n        ImportStatus = L.T("Cancelling'),
     ("window can be closed during an import", os.path.join("src", "PhotoImporter.App", "MainWindow.xaml.cs"),
      "if (_vm.IsImporting)",
      "if (false)"),
@@ -153,7 +153,7 @@ UI_MUTATIONS = [
      "private void ShowInFolder(object? parameter) => WithExistingFile(parameter, ShellLauncher.ShowInFolder);",
      "private void ShowInFolder(object? parameter) => WithExistingFile(parameter, ShellLauncher.Open);"),
     ("nested source/target not blocked", VM,
-     'IsNested() ? "Источник и цель не должны совпадать или находиться одна внутри другой" :',
+     'IsNested() ? L.T("The source and the target must not be the same folder or inside one another", "Источник и цель не должны совпадать или находиться одна внутри другой") :',
      ""),
 ]
 
