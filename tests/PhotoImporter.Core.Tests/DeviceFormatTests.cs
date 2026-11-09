@@ -18,6 +18,10 @@ public class DeviceFormatTests
     [InlineData("IMG_pixel.dng", "2026-05-03 06:10:00", DateSource.Metadata)]
     // Pixel MP4: mdat first, UTC 22:30 + GPS in Berlin -> 00:30 next day; Android keys are ignored.
     [InlineData("VID_pixel.mp4", "2026-05-03 00:30:00", DateSource.Metadata)]
+    // Nikon NEF (big-endian TIFF), Sony ARW (little-endian TIFF), Fujifilm RAF (EXIF inside the embedded JPEG).
+    [InlineData("IMG_nikon.NEF", "2026-08-20 23:55:00", DateSource.Metadata)]
+    [InlineData("IMG_sony.ARW", "2026-09-01 00:05:00", DateSource.Metadata)]
+    [InlineData("IMG_fuji.RAF", "2026-10-10 10:10:00", DateSource.Metadata)]
     public void ReadsDeviceFormats(string file, string expected, DateSource source)
     {
         var path = Path.Combine(Fixtures.FormatsRoot, file);
@@ -27,6 +31,36 @@ public class DeviceFormatTests
 
         Assert.Equal(DateTime.Parse(expected, System.Globalization.CultureInfo.InvariantCulture), date.Local);
         Assert.Equal(source, date.Source);
+    }
+
+    [Theory]
+    // The smallest preview that is still >= 320 px: never the 160x120 thumbnail, never lossless RAW data.
+    [InlineData("IMG_nikon.NEF", 400, 300, 6)] // preview in a sub-IFD; a lossless "RAW" strip next to it must be ignored
+    [InlineData("IMG_sony.ARW", 400, 300, 8)]  // preview referenced from IFD0
+    [InlineData("IMG_canon.CR3", 400, 300, 8)] // PRVW wins over THMB; orientation from CMT1
+    [InlineData("IMG_fuji.RAF", 400, 300, 3)]  // orientation from the embedded JPEG's EXIF
+    public void ExtractsTheEmbeddedPreview(string file, int width, int height, int orientation)
+    {
+        var path = Path.Combine(Fixtures.FormatsRoot, file);
+        Assert.True(EmbeddedPreview.IsRaw(path));
+
+        var preview = EmbeddedPreview.TryRead(path);
+
+        Assert.NotNull(preview);
+        Assert.Equal((width, height), EmbeddedPreview.JpegSize(preview.Jpeg));
+        Assert.Equal(orientation, preview.Orientation);
+        Assert.Equal(0xD9, preview.Jpeg[^1]); // the whole JPEG, up to its end marker
+    }
+
+    [Fact]
+    public void NoPreviewWhereThereIsNone()
+    {
+        Assert.Null(EmbeddedPreview.TryRead(Path.Combine(Fixtures.FormatsRoot, "IMG_pixel.dng"))); // TIFF without a JPEG preview
+        Assert.Null(EmbeddedPreview.TryRead(Path.Combine(Fixtures.MediaRoot, @"photos\IMG_0001.JPG"))); // not a RAW container
+        Assert.Null(EmbeddedPreview.TryRead(Path.Combine(Fixtures.MediaRoot, @"photos\EMPTY.JPG")));
+        Assert.Null(EmbeddedPreview.TryRead(Path.Combine(Fixtures.MediaRoot, "does-not-exist.NEF")));
+        Assert.False(EmbeddedPreview.IsRaw("IMG.JPG"));
+        Assert.False(EmbeddedPreview.IsRaw("VID.MP4"));
     }
 
     [Fact]

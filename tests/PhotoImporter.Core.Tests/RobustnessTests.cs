@@ -31,6 +31,8 @@ public class RobustnessTests
         {
             File.WriteAllBytes(path, bytes);
             var date = reader.Read(path, kind, mtime); // must not throw
+            var preview = EmbeddedPreview.TryRead(path); // must not throw either
+            if (preview is not null) Assert.Equal(0xFF, preview.Jpeg[0]);
             Assert.NotEqual(default, date.Local);
         }
 

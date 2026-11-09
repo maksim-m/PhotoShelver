@@ -48,7 +48,10 @@ public sealed class ThumbnailService : IDisposable
             if (_disposed) return;
             if (!_queue.TryPop(out var item) || !item.IsAlive) continue;
 
-            var image = ShellThumbnail.Get(item.File.Path, PixelSize);
+            // RAW: the camera's embedded preview first (fast, needs no codec); otherwise Windows' thumbnail.
+            var path = item.File.Path;
+            var image = (Core.Metadata.EmbeddedPreview.IsRaw(path) ? RawThumbnail.Get(path, PixelSize) : null)
+                        ?? ShellThumbnail.Get(path, PixelSize);
             _ui.BeginInvoke(DispatcherPriority.Background, () =>
             {
                 if (!item.IsAlive) return;
