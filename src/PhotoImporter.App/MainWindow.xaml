@@ -70,9 +70,21 @@
                 </StackPanel.ContextMenu>
                 <Border Height="100" CornerRadius="4" Background="{DynamicResource ControlFillColorDefaultBrush}" ClipToBounds="True">
                     <Grid>
-                        <TextBlock Text="{Binding Extension}" HorizontalAlignment="Center" VerticalAlignment="Center"
-                                   Style="{StaticResource Secondary}" FontWeight="SemiBold"/>
-                        <Image Source="{Binding Thumbnail}" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality"/>
+                        <TextBlock Text="{Binding Extension}" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="SemiBold">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource Secondary}">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <!-- only while there is no thumbnail: it would show beside a portrait picture -->
+                                        <DataTrigger Binding="{Binding Thumbnail}" Value="{x:Null}">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                        <!-- Uniform: the whole picture is visible, portrait shots are not cropped -->
+                        <Image Source="{Binding Thumbnail}" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
                         <CheckBox AutomationProperties.AutomationId="TileCheck" AutomationProperties.Name="{Binding FileName}" IsChecked="{Binding IsSelected}" IsEnabled="{Binding CanBeImported}" MinWidth="0" Padding="0"
                                   Margin="6" HorizontalAlignment="Left" VerticalAlignment="Top" ToolTip="Импортировать этот файл"/>
                         <Border Style="{StaticResource Badge}" HorizontalAlignment="Right" VerticalAlignment="Bottom"
