@@ -34,7 +34,7 @@ internal static class RawThumbnail
     }
 
     /// <summary>Applies the EXIF orientation (1..8) so the picture is upright.</summary>
-    private static BitmapSource Orient(BitmapSource image, int orientation)
+    internal static BitmapSource Orient(BitmapSource image, int orientation)
     {
         Transform? transform = orientation switch
         {

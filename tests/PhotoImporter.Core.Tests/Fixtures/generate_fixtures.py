@@ -270,6 +270,10 @@ def build_formats():
     exif[0x8769] = {0x9003: "2026:05:03 06:10:00", 0x9004: "2026:05:03 06:10:00"}
     pattern(23).save(os.path.join(FORMATS, "IMG_pixel.dng"), format="TIFF", exif=exif.tobytes())
 
+    # Film-scanner TIFF: uncompressed, stored landscape (240x160) with orientation 8 (the picture is portrait),
+    # no EXIF date at all - dated by the file time. Windows' TIFF thumbnail ignores the orientation.
+    pattern(32, (240, 160)).save(os.path.join(FORMATS, "IMG_scan.tif"), format="TIFF", tiffinfo={0x0112: 8})
+
     # Pixel-style MP4: mdat before moov, GPS in udta/(c)xyz, Android keys in meta (to be ignored), mvhd in UTC.
     # 22:30 UTC in Berlin (summer) is 00:30 the next day.
     android_keys = box("keys", b"\0\0\0\0", struct.pack(">I", 2),

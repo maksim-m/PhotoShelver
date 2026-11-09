@@ -58,6 +58,34 @@ public static class EmbeddedPreview
         }
     }
 
+    // ------------------------------------------------------------------ TIFF image size and orientation
+
+    public static bool IsTiff(string path) => Path.GetExtension(path).ToLowerInvariant() is ".tif" or ".tiff";
+
+    /// <summary>Width, height (as stored) and EXIF orientation from a TIFF's first IFD. Null when it is not readable.</summary>
+    public static TiffImageInfo? TryReadTiffInfo(string path)
+    {
+        try
+        {
+            using var s = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, 4096);
+            var tiff = new TiffReader(s, 0, s.Length);
+            var ifd0 = tiff.Valid ? tiff.ReadIfd(tiff.FirstIfd, out _) : null;
+            if (ifd0 is null) return null;
+            long width = 0, height = 0, orientation = 1;
+            foreach (var e in ifd0)
+            {
+                if (e.Tag == 0x0100) width = tiff.Value(e);
+                else if (e.Tag == 0x0101) height = tiff.Value(e);
+                else if (e.Tag == 0x0112) orientation = tiff.Value(e);
+            }
+            return new TiffImageInfo((int)width, (int)height, orientation is >= 1 and <= 8 ? (int)orientation : 1);
+        }
+        catch (Exception ex) when (ex is not (OutOfMemoryException or StackOverflowException or AccessViolationException))
+        {
+            return null;
+        }
+    }
+
     // ------------------------------------------------------------------ TIFF-based RAW
 
     private static PreviewImage? FromTiff(Stream s, long baseOffset, long end)

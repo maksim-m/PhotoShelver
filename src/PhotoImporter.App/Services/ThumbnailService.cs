@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using PhotoImporter.App.ViewModels;
 
@@ -40,6 +41,25 @@ public sealed class ThumbnailService : IDisposable
     /// <summary>Drops pending requests (e.g. when the source is rescanned).</summary>
     public void ClearQueue() => _queue.Clear();
 
+    /// <summary>Windows' TIFF thumbnail ignores the orientation tag (scans lie on the side); turns it upright.</summary>
+    private static BitmapSource UprightTiff(string path, BitmapSource image)
+    {
+        if (Core.Metadata.EmbeddedPreview.TryReadTiffInfo(path) is not { } info) return image;
+        var orientation = Core.Metadata.ThumbnailOrientation.ToApply(
+            info.Orientation, info.Width, info.Height, image.PixelWidth, image.PixelHeight);
+        if (orientation == 1) return image;
+        try
+        {
+            var result = RawThumbnail.Orient(image, orientation);
+            result.Freeze();
+            return result;
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+        {
+            return image;
+        }
+    }
+
     private void Worker()
     {
         while (!_disposed)
@@ -52,6 +72,7 @@ public sealed class ThumbnailService : IDisposable
             var path = item.File.Path;
             var image = (Core.Metadata.EmbeddedPreview.IsRaw(path) ? RawThumbnail.Get(path, PixelSize) : null)
                         ?? ShellThumbnail.Get(path, PixelSize);
+            if (image is not null && Core.Metadata.EmbeddedPreview.IsTiff(path)) image = UprightTiff(path, image);
             _ui.BeginInvoke(DispatcherPriority.Background, () =>
             {
                 if (!item.IsAlive) return;
