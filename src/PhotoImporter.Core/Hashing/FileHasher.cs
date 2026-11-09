@@ -11,7 +11,11 @@ public readonly record struct DiskHash(UInt128 Hash, bool BypassedCache);
 
 public static class FileHasher
 {
-    internal const int BufferSize = 1024 * 1024;
+    /// <summary>
+    /// Chunk for every read, copy and hash: 4 MB (a multiple of every sector size, as unbuffered reads require).
+    /// Measured on NVMe: unbuffered reads run at ~2.3 GB/s with 4 MB chunks vs ~1.0–1.4 GB/s with 1 MB.
+    /// </summary>
+    internal const int BufferSize = 4 * 1024 * 1024;
 
     public static UInt128 Hash(string path, CancellationToken ct = default)
     {
@@ -28,7 +32,7 @@ public static class FileHasher
     public static unsafe DiskHash HashFromDisk(string path, CancellationToken ct = default, bool forceCached = false)
     {
         const FileOptions noBuffering = (FileOptions)0x20000000;
-        const int chunk = 1 << 20; // a multiple of every sector size
+        const int chunk = BufferSize;
         if (forceCached) return new DiskHash(Hash(path, ct), BypassedCache: false);
 
         SafeFileHandle handle;

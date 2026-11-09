@@ -37,6 +37,43 @@ public class ImporterSafetyTests
     }
 
     [Theory]
+    [InlineData(ImportMode.Copy, true)]
+    [InlineData(ImportMode.Move, true)]
+    [InlineData(ImportMode.Copy, false)]
+    [InlineData(ImportMode.Move, false)]
+    public void VerificationReadFailureImportsNothing(ImportMode mode, bool copyUnreadable)
+    {
+        // The copy and the source are re-read at the same time on different volumes: a failure of either read
+        // must stop the file exactly like a mismatch (nothing placed, source kept, temp file removed).
+        using var dir = new TempDir();
+        var src = dir.File(@"src\IMG.JPG", "original bytes");
+        var dest = Path.Combine(dir.Path, "dst");
+        FileStream? lockStream = null;
+        var importer = new Importer
+        {
+            TreatAsDifferentVolumes = true,
+            RetryDelays = Fast,
+            AfterTempWritten = temp => lockStream = new FileStream(copyUnreadable ? temp : src, FileMode.Open, FileAccess.ReadWrite, FileShare.None),
+        };
+
+        ImportResult result;
+        try
+        {
+            // The temp file can only be deleted once the lock is gone, so release it right after the failure.
+            result = importer.Run([Job(src, dest)], mode, null, default);
+        }
+        finally
+        {
+            lockStream?.Dispose();
+        }
+
+        Assert.Empty(result.Imported);
+        Assert.Single(result.Failures);
+        Assert.Equal("original bytes", File.ReadAllText(src));
+        Assert.DoesNotContain(Directory.GetFiles(dest), f => !f.EndsWith(".importing", StringComparison.Ordinal));
+    }
+
+    [Theory]
     [InlineData(ImportMode.Copy)]
     [InlineData(ImportMode.Move)]
     public void SourceReadingDifferentlyOnRereadIsDetected(ImportMode mode)
@@ -107,20 +144,22 @@ public class ImporterSafetyTests
     {
         // Disk full, card pulled out, network share gone…
         using var dir = new TempDir();
-        var src = dir.File(@"src\VID.MP4", new string('v', 3_500_000));
+        // Several copy chunks; the disk "fills up" after the first one.
+        var size = 2 * FileHasher.BufferSize + 500_000;
+        var src = dir.File(@"src\VID.MP4", new string('v', size));
         var dest = Path.Combine(dir.Path, "dst");
         dir.File(@"dst\existing.jpg", "keep me");
         var importer = new Importer
         {
             TreatAsDifferentVolumes = crossVolume,
-            DuringCopy = written => { if (written > 1_000_000) throw new IOException("There is not enough space on the disk."); },
+            DuringCopy = written => { if (written >= FileHasher.BufferSize) throw new IOException("There is not enough space on the disk."); },
         };
 
         var result = importer.Run([Job(src, dest)], mode, null, default);
 
         Assert.Empty(result.Imported);
         Assert.Contains("space", Assert.Single(result.Failures).Message);
-        Assert.Equal(3_500_000, new FileInfo(src).Length);
+        Assert.Equal(size, new FileInfo(src).Length);
         Assert.Equal(["existing.jpg"], Directory.GetFiles(dest).Select(Path.GetFileName));
         Assert.Equal("keep me", File.ReadAllText(Path.Combine(dest, "existing.jpg")));
     }

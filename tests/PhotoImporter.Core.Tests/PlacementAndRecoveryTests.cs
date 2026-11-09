@@ -18,6 +18,10 @@ public class PlacementAndRecoveryTests
     [InlineData(1 << 20)]
     [InlineData((1 << 20) + 1)]
     [InlineData(3 * (1 << 20) + 123)]
+    [InlineData(FileHasher.BufferSize - 1)] // around the chunk boundary of unbuffered reads
+    [InlineData(FileHasher.BufferSize)]
+    [InlineData(FileHasher.BufferSize + 1)]
+    [InlineData(2 * FileHasher.BufferSize + 4096)]
     public void HashFromDiskMatchesNormalHash(int size)
     {
         using var dir = new TempDir();

@@ -230,10 +230,9 @@ public sealed class Importer
             }
             AfterTempWritten?.Invoke(temp);
 
-            var copyOnDisk = FileHasher.HashFromDisk(temp, forceCached: ForceCachedVerification);
+            var (copyOnDisk, sourceOnDevice) = ReadBothFromDevice(temp, job.SourcePath);
             if (copyOnDisk.Hash != copiedHash)
                 throw new InvalidDataException("Копия на диске не совпадает с прочитанными данными (ошибка записи). Файл не импортирован");
-            var sourceOnDevice = FileHasher.HashFromDisk(job.SourcePath, forceCached: ForceCachedVerification);
             if (sourceOnDevice.Hash != copiedHash)
                 throw new InvalidDataException("Исходный файл при повторном чтении отличается от скопированного (нестабильное чтение или файл изменился). Файл не импортирован");
             if (!copyOnDisk.BypassedCache) cachedVolumes.Add(VolumeLabel(job.DestinationFolder));
@@ -270,6 +269,33 @@ public sealed class Importer
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// Re-reads the copy and the source from their devices. On different volumes both reads run at the same time
+    /// (each device works at its own speed); on one volume they run one after the other, so a hard disk does not
+    /// seek back and forth. Either way both results are complete before anything is decided, and an error of
+    /// either read is thrown (the copy's first, as before).
+    /// </summary>
+    private (DiskHash Copy, DiskHash Source) ReadBothFromDevice(string copy, string source)
+    {
+        if (!TreatAsDifferentVolumes && PathUtil.IsSameVolume(copy, source))
+            return (FileHasher.HashFromDisk(copy, forceCached: ForceCachedVerification),
+                    FileHasher.HashFromDisk(source, forceCached: ForceCachedVerification));
+
+        var sourceRead = Task.Run(() => FileHasher.HashFromDisk(source, forceCached: ForceCachedVerification));
+        DiskHash copyHash;
+        try
+        {
+            copyHash = FileHasher.HashFromDisk(copy, forceCached: ForceCachedVerification);
+        }
+        catch
+        {
+            // Never leave the source read running behind our back.
+            try { sourceRead.Wait(); } catch (AggregateException) { }
+            throw;
+        }
+        return (copyHash, sourceRead.GetAwaiter().GetResult()); // GetResult rethrows the original exception
     }
 
     private static string VolumeLabel(string path) => Path.GetPathRoot(Path.GetFullPath(path)) ?? path;
