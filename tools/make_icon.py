@@ -1,6 +1,6 @@
 """
 Draws the application icon: a photo (mountains + sun) on a blue Windows-11-style tile with an orange
-"import" badge (down arrow). Writes src/PhotoImporter.App/Assets/app.ico with 16-256 px images.
+"import" badge (down arrow). Writes src/PhotoShelver.App/Assets/app.ico with 16-256 px images.
 Small sizes use a simplified drawing so they stay readable in the taskbar and title bar.
 
 Requires Pillow:  python tools/make_icon.py [preview.png]
@@ -11,7 +11,7 @@ import sys
 from PIL import Image, ImageDraw, ImageFilter
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT = os.path.join(REPO, "src", "PhotoImporter.App", "Assets", "app.ico")
+OUT = os.path.join(REPO, "src", "PhotoShelver.App", "Assets", "app.ico")
 SIZES = [16, 20, 24, 32, 40, 48, 64, 128, 256]
 
 BLUE_TOP = (59, 130, 246)

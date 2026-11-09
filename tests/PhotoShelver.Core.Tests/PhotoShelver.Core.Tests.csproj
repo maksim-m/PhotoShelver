@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Fixtures\media\**\*" CopyToOutputDirectory="PreserveNewest" LinkBase="Fixtures\media" />
+    <None Include="Fixtures\formats\**\*" CopyToOutputDirectory="PreserveNewest" LinkBase="Fixtures\formats" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\PhotoShelver.Core\PhotoShelver.Core.csproj" />
+  </ItemGroup>
+</Project>

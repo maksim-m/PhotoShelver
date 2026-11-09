@@ -6,7 +6,7 @@ Then the UI test for a write-protected card runs in the real window (the app off
 UI windows appear for a few seconds - do not touch them.
 The disks are always detached and their files deleted at the end.
 
-Safety: only two new files are created, in %TEMP%\PhotoImporterRealVolume. Every disk operation
+Safety: only two new files are created, in %TEMP%\PhotoShelverRealVolume. Every disk operation
 (initialize, partition, format) addresses the disk by the number Windows reports for *that image file*,
 after checking it is a file-backed virtual disk whose image path is ours and whose size is <= 300 MB.
 Real disks are never selected, partitioned or formatted. diskpart is only used to create the image file.
@@ -20,7 +20,7 @@ To test a real SD card / USB disk instead, see the header of RealVolumeTests.cs.
 param([switch]$Elevated)
 
 $Repo = Split-Path -Parent $PSScriptRoot
-$Work = Join-Path $env:TEMP "PhotoImporterRealVolume"
+$Work = Join-Path $env:TEMP "PhotoShelverRealVolume"
 $Log = Join-Path $Work "run.log"
 $TestOut = Join-Path $Work "tests.txt"
 $Dotnet = (Get-Command dotnet -ErrorAction SilentlyContinue).Source
@@ -30,9 +30,9 @@ if (-not $Elevated) {
     New-Item -ItemType Directory -Force $Work | Out-Null
     Remove-Item $Log, $TestOut -ErrorAction SilentlyContinue
     # Build as the current user so the elevated run does not create admin-owned files in the repo.
-    & $Dotnet build (Join-Path $Repo "tests\PhotoImporter.Core.Tests") -nologo -v q
+    & $Dotnet build (Join-Path $Repo "tests\PhotoShelver.Core.Tests") -nologo -v q
     if ($LASTEXITCODE -ne 0) { throw "build failed" }
-    & $Dotnet build (Join-Path $Repo "tests\PhotoImporter.UiTests") -nologo -v q
+    & $Dotnet build (Join-Path $Repo "tests\PhotoShelver.UiTests") -nologo -v q
     if ($LASTEXITCODE -ne 0) { throw "build failed" }
     Start-Process powershell.exe -Verb RunAs -Wait -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$PSCommandPath`"", '-Elevated')
     Get-Content $Log | Where-Object { $_ -match '^\d\d:\d\d' }
@@ -86,7 +86,7 @@ try {
     $X = New-TestVolume $rw "PI_RW"
     $Y = New-TestVolume $ro "PI_RO"
 
-    Copy-Item (Join-Path $Repo "tests\PhotoImporter.Core.Tests\Fixtures\media") "${Y}:\card" -Recurse
+    Copy-Item (Join-Path $Repo "tests\PhotoShelver.Core.Tests\Fixtures\media") "${Y}:\card" -Recurse
     Dismount-DiskImage -ImagePath $ro | Out-Null
     Mount-DiskImage -ImagePath $ro -Access ReadOnly | Out-Null
     $disk = Get-OwnVirtualDisk $ro
@@ -98,13 +98,13 @@ try {
     if ($wrote) { throw "read-only test disk accepted a write" }
     Log "read-only disk refuses writes: OK"
 
-    $env:PHOTOIMPORTER_TEST_VOLUME = "${X}:\"
-    $env:PHOTOIMPORTER_TEST_READONLY_VOLUME = "${Y}:\"
-    cmd /c "`"$Dotnet`" test `"$Repo\tests\PhotoImporter.Core.Tests`" --filter Category=RealVolume --no-build -nologo --logger `"console;verbosity=detailed`" > `"$TestOut`" 2>&1"
+    $env:PHOTOSHELVER_TEST_VOLUME = "${X}:\"
+    $env:PHOTOSHELVER_TEST_READONLY_VOLUME = "${Y}:\"
+    cmd /c "`"$Dotnet`" test `"$Repo\tests\PhotoShelver.Core.Tests`" --filter Category=RealVolume --no-build -nologo --logger `"console;verbosity=detailed`" > `"$TestOut`" 2>&1"
     Log "tests finished, exit code $LASTEXITCODE"
 
-    $env:PHOTOIMPORTER_UI_TESTS = "1"
-    cmd /c "`"$Dotnet`" test `"$Repo\tests\PhotoImporter.UiTests`" --filter Category=RealVolumeUi --no-build -nologo --logger `"console;verbosity=detailed`" >> `"$TestOut`" 2>&1"
+    $env:PHOTOSHELVER_UI_TESTS = "1"
+    cmd /c "`"$Dotnet`" test `"$Repo\tests\PhotoShelver.UiTests`" --filter Category=RealVolumeUi --no-build -nologo --logger `"console;verbosity=detailed`" >> `"$TestOut`" 2>&1"
     Log "UI tests finished, exit code $LASTEXITCODE"
 }
 catch { Log ("ERROR: " + $_) }

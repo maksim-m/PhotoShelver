@@ -20,10 +20,10 @@ import subprocess
 import sys
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-TESTS = os.path.join("tests", "PhotoImporter.Core.Tests")
-IMP = os.path.join("src", "PhotoImporter.Core", "Importing", "Importer.cs")
-DUP = os.path.join("src", "PhotoImporter.Core", "Scanning", "DuplicateDetector.cs")
-CDR = os.path.join("src", "PhotoImporter.Core", "Metadata", "CaptureDateReader.cs")
+TESTS = os.path.join("tests", "PhotoShelver.Core.Tests")
+IMP = os.path.join("src", "PhotoShelver.Core", "Importing", "Importer.cs")
+DUP = os.path.join("src", "PhotoShelver.Core", "Scanning", "DuplicateDetector.cs")
+CDR = os.path.join("src", "PhotoShelver.Core", "Metadata", "CaptureDateReader.cs")
 
 # (description, file, original snippet, mutated snippet)
 MUTATIONS = [
@@ -45,7 +45,7 @@ MUTATIONS = [
     ("no retry when another program holds the file", IMP,
      "TransientRetry.Run(() => place(candidate), RetryDelays);",
      "place(candidate);"),
-    ("leftover cleanup deletes any file", os.path.join("src", "PhotoImporter.Core", "Importing", "ImportLeftovers.cs"),
+    ("leftover cleanup deletes any file", os.path.join("src", "PhotoShelver.Core", "Importing", "ImportLeftovers.cs"),
      "if (!IsLeftover(Path.GetFileName(path)))",
      "if (false)"),
     ("source-changed check disabled", IMP,
@@ -78,41 +78,41 @@ MUTATIONS = [
     ("camera-protected original deleted anyway", IMP,
      "if (source.Attributes.HasFlag(FileAttributes.ReadOnly))",
      "if (false)"),
-    ("read-only source file treated as deletable", os.path.join("src", "PhotoImporter.Core", "PathUtil.cs"),
+    ("read-only source file treated as deletable", os.path.join("src", "PhotoShelver.Core", "PathUtil.cs"),
      "if (File.GetAttributes(filePath).HasFlag(FileAttributes.ReadOnly)) return false;",
      ""),
-    ("scan follows folder links (junction loops)", os.path.join("src", "PhotoImporter.Core", "PathUtil.cs"),
+    ("scan follows folder links (junction loops)", os.path.join("src", "PhotoShelver.Core", "PathUtil.cs"),
      "!e.Attributes.HasFlag(FileAttributes.ReparsePoint) || !IsFolderLink(e.ToFullPath())",
      "true"),
-    ("drive-root target joins paths without a separator", os.path.join("src", "PhotoImporter.Core", "PathUtil.cs"),
+    ("drive-root target joins paths without a separator", os.path.join("src", "PhotoShelver.Core", "PathUtil.cs"),
      "return Path.EndsInDirectorySeparator(full) ? full : full + Path.DirectorySeparatorChar;",
      "return Path.TrimEndingDirectorySeparator(full) + Path.DirectorySeparatorChar;"),
     ("files not reported to the import log", IMP,
      "onFileDone?.Invoke(new ImportFileOutcome(",
      "_ = (new ImportFileOutcome("),
     ("Canon video EXIF ignored (UTC + PC zone instead of the camera clock)",
-     os.path.join("src", "PhotoImporter.Core", "Metadata", "IsoBmffReader.cs"),
+     os.path.join("src", "PhotoShelver.Core", "Metadata", "IsoBmffReader.cs"),
      "state.EmbeddedJpeg ??= ReadCanonThumbnail(s, box);",
      ""),
-    ("lossless RAW data taken for a preview", os.path.join("src", "PhotoImporter.Core", "Metadata", "EmbeddedPreview.cs"),
+    ("lossless RAW data taken for a preview", os.path.join("src", "PhotoShelver.Core", "Metadata", "EmbeddedPreview.cs"),
      "if (marker is 0xC0 or 0xC1 or 0xC2)",
      "if (marker is >= 0xC0 and <= 0xC3)"),
-    ("RAW preview orientation ignored", os.path.join("src", "PhotoImporter.Core", "Metadata", "EmbeddedPreview.cs"),
+    ("RAW preview orientation ignored", os.path.join("src", "PhotoShelver.Core", "Metadata", "EmbeddedPreview.cs"),
      "case 0x0112 when isIfd0: orientation = (int)tiff.Value(e); break;",
      ""),
-    ("source deleted before the placed file is committed", os.path.join("src", "PhotoImporter.Core", "Importing", "Importer.cs"),
+    ("source deleted before the placed file is committed", os.path.join("src", "PhotoShelver.Core", "Importing", "Importer.cs"),
      "TransientRetry.Run(() => CommitPlaced(dest), RetryDelays);",
      ""),
-    ("parallel verification ignores the source re-read", os.path.join("src", "PhotoImporter.Core", "Importing", "Importer.cs"),
+    ("parallel verification ignores the source re-read", os.path.join("src", "PhotoShelver.Core", "Importing", "Importer.cs"),
      "return (copyHash, sourceRead.GetAwaiter().GetResult());",
      "return (copyHash, copyHash);"),
-    ("verification chunk not sector aligned", os.path.join("src", "PhotoImporter.Core", "Hashing", "FileHasher.cs"),
+    ("verification chunk not sector aligned", os.path.join("src", "PhotoShelver.Core", "Hashing", "FileHasher.cs"),
      "const int chunk = BufferSize;",
      "const int chunk = BufferSize - 1;"),
-    ("TIFF thumbnail turned twice", os.path.join("src", "PhotoImporter.Core", "Metadata", "ThumbnailOrientation.cs"),
+    ("TIFF thumbnail turned twice", os.path.join("src", "PhotoShelver.Core", "Metadata", "ThumbnailOrientation.cs"),
      "return storedLandscape == thumbLandscape ? orientation : 1;",
      "return orientation;"),
-    ("TIFF orientation tag not read", os.path.join("src", "PhotoImporter.Core", "Metadata", "EmbeddedPreview.cs"),
+    ("TIFF orientation tag not read", os.path.join("src", "PhotoShelver.Core", "Metadata", "EmbeddedPreview.cs"),
      "else if (e.Tag == 0x0112) orientation = tiff.Value(e);",
      ""),
     ("metadata errors not caught", CDR,
@@ -120,8 +120,8 @@ MUTATIONS = [
      "catch (IOException)\n        {\n            // Malformed"),
 ]
 
-UI_TESTS = os.path.join("tests", "PhotoImporter.UiTests")
-VM = os.path.join("src", "PhotoImporter.App", "ViewModels", "MainViewModel.cs")
+UI_TESTS = os.path.join("tests", "PhotoShelver.UiTests")
+VM = os.path.join("src", "PhotoShelver.App", "ViewModels", "MainViewModel.cs")
 
 # Mutations of the app's view models, checked by the end-to-end UI tests (--ui).
 UI_MUTATIONS = [
@@ -131,10 +131,10 @@ UI_MUTATIONS = [
     ("plugged-in disk not noticed", VM,
      "_environmentTimer.Start();",
      ""),
-    ("selection not reset to 'all new' after the duplicate check", os.path.join("src", "PhotoImporter.App", "ViewModels", "MediaItemViewModel.cs"),
+    ("selection not reset to 'all new' after the duplicate check", os.path.join("src", "PhotoShelver.App", "ViewModels", "MediaItemViewModel.cs"),
      "IsSelected = IsNew;",
      ""),
-    ("day checkbox also ticks duplicates", os.path.join("src", "PhotoImporter.App", "ViewModels", "GridRows.cs"),
+    ("day checkbox also ticks duplicates", os.path.join("src", "PhotoShelver.App", "ViewModels", "GridRows.cs"),
      "foreach (var item in Items.Where(i => i.IsNew)) item.IsSelected = true;",
      "foreach (var item in Items) item.IsSelected = item.CanBeImported;"),
     ("leftovers deleted without confirmation", VM,
@@ -143,10 +143,10 @@ UI_MUTATIONS = [
     ("Cancel button does nothing", VM,
      '_importCts?.Cancel();\n        ImportStatus = L.T("Cancelling',
      '\n        ImportStatus = L.T("Cancelling'),
-    ("window can be closed during an import", os.path.join("src", "PhotoImporter.App", "MainWindow.xaml.cs"),
+    ("window can be closed during an import", os.path.join("src", "PhotoShelver.App", "MainWindow.xaml.cs"),
      "if (_vm.IsImporting)",
      "if (false)"),
-    ("double click does not open the file", os.path.join("src", "PhotoImporter.App", "MainWindow.xaml"),
+    ("double click does not open the file", os.path.join("src", "PhotoShelver.App", "MainWindow.xaml"),
      'Gesture="LeftDoubleClick"',
      'Gesture="MiddleDoubleClick"'),
     ("'Show in folder' opens the file instead", VM,
@@ -182,7 +182,7 @@ def find_dotnet():
 def run_tests(dotnet, ui=False):
     env = dict(os.environ)
     if ui:
-        env["PHOTOIMPORTER_UI_TESTS"] = "1"
+        env["PHOTOSHELVER_UI_TESTS"] = "1"
         # The UI tests start the app's exe: build it (and the tests) first; a build error counts as "caught".
         build = subprocess.run([dotnet, "build", UI_TESTS, "-nologo", "-v", "q"], cwd=REPO, env=env,
                                capture_output=True, text=True, encoding="utf-8", errors="replace")
