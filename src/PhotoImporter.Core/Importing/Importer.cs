@@ -17,7 +17,8 @@ public sealed record ImportProgress(int FilesDone, int FilesTotal, long BytesDon
 
 public sealed record ImportFailure(string SourcePath, string Message);
 
-public sealed record ImportedFile(string SourcePath, string DestinationPath);
+/// <param name="Hash">xxHash128 of the verified content (null for a same-volume rename, which does not read the file).</param>
+public sealed record ImportedFile(string SourcePath, string DestinationPath, UInt128? Hash = null);
 
 /// <param name="Warnings">Non-fatal remarks about the import as a whole (e.g. a weaker verification on some volume).</param>
 public sealed record ImportResult(
@@ -60,7 +61,8 @@ public sealed class Importer
         IReadOnlyList<ImportJob> jobs,
         ImportMode mode,
         IProgress<ImportProgress>? progress,
-        CancellationToken ct)
+        CancellationToken ct,
+        Action<ImportFileOutcome>? onFileDone = null)
     {
         var imported = new List<ImportedFile>();
         var failures = new List<ImportFailure>();
@@ -87,6 +89,8 @@ public sealed class Importer
 
             var job = jobs[i];
             var startBytes = bytesDone;
+            var importedBefore = imported.Count;
+            var failuresBefore = failures.Count;
             Report(i, bytesDone, job.SourcePath, force: true);
             try
             {
@@ -98,6 +102,10 @@ public sealed class Importer
                 failures.Add(new ImportFailure(job.SourcePath, ex.Message));
             }
             bytesDone = startBytes + job.Size;
+            onFileDone?.Invoke(new ImportFileOutcome(
+                job,
+                imported.Count > importedBefore ? imported[^1] : null,
+                failures.Count > failuresBefore ? failures[^1].Message : null));
         }
 
         Report(jobs.Count, bytesDone, null, force: true);
@@ -134,8 +142,8 @@ public sealed class Importer
             return;
         }
 
-        var (dest, sourceReadFromDevice) = CopyViaTemp(job, onBytes, cachedVolumes);
-        imported.Add(new ImportedFile(job.SourcePath, dest));
+        var (dest, sourceReadFromDevice, hash) = CopyViaTemp(job, onBytes, cachedVolumes);
+        imported.Add(new ImportedFile(job.SourcePath, dest, hash));
         if (mode != ImportMode.Move) return;
 
         // Cross-volume move: delete the source only if it is exactly what was copied and verified.
@@ -199,7 +207,7 @@ public sealed class Importer
     /// re-read from its device; both must match the data that was copied. On any mismatch nothing is placed.
     /// Returns the placed path and whether the source re-read really came from the device.
     /// </summary>
-    private (string Path, bool SourceReadFromDevice) CopyViaTemp(ImportJob job, Action<long> onBytes, ISet<string> cachedVolumes)
+    private (string Path, bool SourceReadFromDevice, UInt128 Hash) CopyViaTemp(ImportJob job, Action<long> onBytes, ISet<string> cachedVolumes)
     {
         var fileName = Path.GetFileName(job.SourcePath);
         string? temp = null;
@@ -245,7 +253,7 @@ public sealed class Importer
             var tempPath = temp;
             var placed = PlaceWithSuffix(fileName, job.DestinationFolder, candidate => File.Move(tempPath, candidate, overwrite: false));
             ownsTemp = false; // it has become the imported file
-            return (placed, sourceOnDevice.BypassedCache);
+            return (placed, sourceOnDevice.BypassedCache, copiedHash);
         }
         finally
         {

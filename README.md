@@ -56,7 +56,9 @@ dotnet publish src/PhotoImporter.App -c Release -o publish
 
 Получается один файл `publish\PhotoImporter.exe` (~66 МБ, runtime внутри). Пользователю ничего устанавливать не нужно.
 
-Настройки (последние папки, шаблон, режим) хранятся в `%LOCALAPPDATA%\PhotoImporter\settings.json`.
+Настройки (последние папки, шаблон, режим) хранятся в `%LOCALAPPDATA%\PhotoImporter\settings.json`, журналы импорта — в `%LOCALAPPDATA%\PhotoImporter\logs`.
+
+Иконка (`src/PhotoImporter.App/Assets/app.ico`) рисуется скриптом `python tools/make_icon.py` (нужен Pillow).
 
 ## Структура
 

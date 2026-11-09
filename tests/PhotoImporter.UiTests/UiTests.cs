@@ -75,6 +75,14 @@ public class UiTests
         Assert.Contains("Импортировано: 15 файлов", dialog.Details);
         Assert.Empty(dialog.Failures);
 
+        // The import log sits next to the (test) settings file and lists every file.
+        Assert.True(dialog.HasLogButton);
+        var log = Assert.Single(Directory.GetFiles(Path.Combine(ws.Root, "logs"), "import-*.log"));
+        var logLines = File.ReadAllLines(log);
+        Assert.Equal(15, logLines.Count(l => l.StartsWith("[OK]", StringComparison.Ordinal)));
+        Assert.Contains(logLines, l => l.Contains("IMG_0001.JPG → ") && l.Contains("IMG_0001_1.JPG"));
+        Assert.Contains("Итог:     импортировано 15, ошибок 0", logLines);
+
         var after = new[] { Snapshot.Take(ws.Card), Snapshot.Take(ws.Library) };
         Invariants.NothingLost(before, after);
         Invariants.TargetFilesUnchanged(before[1], after[1]);

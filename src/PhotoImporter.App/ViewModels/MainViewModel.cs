@@ -54,8 +54,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _initializing = false;
     }
 
-    /// <summary>Raised after an import finishes (result, target folder).</summary>
-    public event Action<ImportResult, string>? ImportFinished;
+    /// <summary>Raised after an import finishes.</summary>
+    public event Action<ImportFinishedInfo>? ImportFinished;
 
     public ObservableCollection<GridRow> Rows { get; } = [];
 
@@ -357,6 +357,9 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             return;
         }
 
+        var version = typeof(MainViewModel).Assembly.GetName().Version?.ToString(3) ?? "?";
+        var log = ImportLog.Start(SettingsStore.LogsDirectory, mode, SourcePath!, target, template.Pattern, jobs, version);
+
         _importCts = new CancellationTokenSource();
         var token = _importCts.Token;
         var clock = Stopwatch.StartNew();
@@ -380,7 +383,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         ImportResult result;
         try
         {
-            result = await Task.Run(() => _importer.Run(jobs, mode, progress, token));
+            result = await Task.Run(() => _importer.Run(jobs, mode, progress, token, log.Record));
+            log.Finish(result);
         }
         catch (Exception ex)
         {
@@ -397,7 +401,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             _importCts = null;
         }
 
-        ImportFinished?.Invoke(result, target);
+        ImportFinished?.Invoke(new ImportFinishedInfo(result, target, log.Error is null ? log.Path : null, log.Error));
         _ = FindLeftoversAsync();
         StartScan();
     }

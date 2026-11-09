@@ -42,7 +42,7 @@ public sealed record UiSettings(
     bool IncludeSubfolders = true,
     bool ShowFullTree = true);
 
-public sealed record ImportDialog(string Headline, string Details, string? Warnings, IReadOnlyList<string> Failures);
+public sealed record ImportDialog(string Headline, string Details, string? Warnings, IReadOnlyList<string> Failures, bool HasLogButton);
 
 /// <summary>
 /// Runs the real PhotoImporter.exe with its own settings file (never the user's) and drives it through UI Automation.
@@ -199,7 +199,8 @@ public sealed class AppSession : IDisposable
             Find("SummaryHeadline", dialog).Current.Name,
             Find("SummaryDetails", dialog).Current.Name,
             TryFind("SummaryWarnings", dialog)?.Current.Name,
-            failures);
+            failures,
+            TryFind("SummaryOpenLog", dialog) is not null);
         Click(Find("SummaryClose", dialog));
         WaitUntil(() => Window.FindFirst(TreeScope.Children, new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Window)) is null, "summary dialog to close");
         return result;

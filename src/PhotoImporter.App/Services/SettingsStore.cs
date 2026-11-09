@@ -24,6 +24,9 @@ public static class SettingsStore
             ? custom
             : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PhotoImporter", "settings.json");
 
+    /// <summary>Import logs live next to the settings file (in tests that is a temp folder).</summary>
+    public static string LogsDirectory => Path.Combine(Path.GetDirectoryName(FilePath)!, "logs");
+
     private static readonly JsonSerializerOptions Options = new() { WriteIndented = true };
 
     public static AppSettings Load()

@@ -71,9 +71,9 @@ public partial class MainWindow : Window
         return null;
     }
 
-    private void OnImportFinished(ImportResult result, string targetFolder)
+    private void OnImportFinished(ImportFinishedInfo info)
     {
-        new ImportSummaryWindow(result, targetFolder) { Owner = this }.ShowDialog();
+        new ImportSummaryWindow(info) { Owner = this }.ShowDialog();
     }
 
     protected override void OnClosing(CancelEventArgs e)
