@@ -231,7 +231,8 @@ public sealed class Importer
 
     private static bool IsPlainFileName(string name) =>
         name.Length > 0 && name.Trim() == name && !name.EndsWith('.') && name is not ("." or "..")
-        && name.IndexOfAny(Path.GetInvalidFileNameChars()) < 0;
+        && name.IndexOfAny(Path.GetInvalidFileNameChars()) < 0
+        && !FolderTemplate.ReservedNames.Contains(name.Split('.')[0]); // CON, NUL.JPG… would address a device
 
     private static bool SamePath(string a, string b) =>
         string.Equals(PathUtil.WithoutTrailingSeparator(a), PathUtil.WithoutTrailingSeparator(b), StringComparison.OrdinalIgnoreCase);

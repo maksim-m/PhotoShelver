@@ -9,7 +9,7 @@ public class ImportLogTests
 
     private static (ImportResult Result, ImportLog Log) RunWithLog(TempDir dir, IReadOnlyList<ImportJob> jobs, ImportMode mode, Importer? importer = null)
     {
-        var log = ImportLog.Start(Path.Combine(dir.Path, "logs"), mode, @"E:\DCIM", Path.Combine(dir.Path, "dst"), "YYYY/YYYY-MM-DD", jobs, "1.2.3",
+        var log = ImportLog.Start(Path.Combine(dir.Path, "logs"), mode, @"E:\DCIM", Path.Combine(dir.Path, "dst"), "{YYYY}/{YYYY}-{MM}-{DD}", jobs, "1.2.3",
             new DateTime(2026, 11, 9, 14, 30, 12));
         var result = (importer ?? new Importer()).Run(jobs, mode, null, default, log.Record);
         log.Finish(result, new DateTime(2026, 11, 9, 14, 31, 0));

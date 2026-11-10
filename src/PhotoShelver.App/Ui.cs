@@ -27,15 +27,15 @@ public static class Ui
     public static string Target => L.T("Target", "Цель");
     public static string FolderTemplate => L.T("Folder template", "Шаблон папок");
     public static string TemplateTip => L.T(
-        "Pick a preset or type your own. YYYY — year, YY — year (2 digits), MM — month, MMM — month (Jan…Dec), DD — day, / — subfolder",
-        "Выберите вариант или введите свой. YYYY — год, YY — год (2 цифры), MM — месяц, MMM — месяц (Jan…Dec), DD — день, / — вложенная папка");
-    public static string TemplateLegend => L.T("YYYY · YY · MM · MMM · DD · / — new level", "YYYY · YY · MM · MMM · DD · / — новый уровень");
+        "Pick a preset or type your own. Tokens in braces: {YYYY} — year, {YY} — year (2 digits), {MM} — month, {MMM} — month (Jan…Dec), {DD} — day; / — subfolder. Text outside braces is kept as is",
+        "Выберите вариант или введите свой. Токены в фигурных скобках: {YYYY} — год, {YY} — год (2 цифры), {MM} — месяц, {MMM} — месяц (Jan…Dec), {DD} — день; / — вложенная папка. Текст вне скобок остаётся как есть");
+    public static string TemplateLegend => L.T("{YYYY} · {YY} · {MM} · {MMM} · {DD} · / — new level", "{YYYY} · {YY} · {MM} · {MMM} · {DD} · / — новый уровень");
     public static string Advanced => L.T("Advanced", "Дополнительно");
     public static string FileNames => L.T("File names", "Имена файлов");
     public static string NameTemplateTip => L.T(
-        "NAME — the original name (keeps names as they are), YYYY, YY, MM, MMM, DD — date, HH, mm, ss — time of the shot. The extension is always kept",
-        "NAME — исходное имя (оставить имена как есть), YYYY, YY, MM, MMM, DD — дата, HH, mm, ss — время съёмки. Расширение всегда сохраняется");
-    public static string NameTemplateLegend => L.T("NAME — original name · YYYY · MM · DD · HH · mm · ss", "NAME — исходное имя · YYYY · MM · DD · HH · mm · ss");
+        "Tokens in braces: {NAME} — the original name ({NAME} alone keeps names as they are), {YYYY}, {YY}, {MM}, {MMM}, {DD} — date, {HH}, {mm}, {ss} — time of the shot. Text outside braces is kept as is; the extension is always kept",
+        "Токены в фигурных скобках: {NAME} — исходное имя (один {NAME} — имена как есть), {YYYY}, {YY}, {MM}, {MMM}, {DD} — дата, {HH}, {mm}, {ss} — время съёмки. Текст вне скобок остаётся как есть; расширение всегда сохраняется");
+    public static string NameTemplateLegend => L.T("{NAME} — original name · {YYYY} · {MM} · {DD} · {HH} · {mm} · {ss}", "{NAME} — исходное имя · {YYYY} · {MM} · {DD} · {HH} · {mm} · {ss}");
     public static string ShowFullTree => L.T("Show the whole tree", "Показать всё дерево");
     public static string Show => L.T("Show", "Показать");
     public static string Delete => L.T("Delete", "Удалить");

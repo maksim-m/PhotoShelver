@@ -37,7 +37,7 @@ public sealed class ReadOnlyCardUiFact : FactAttribute
 public sealed record UiSettings(
     string SourcePath,
     string TargetPath,
-    string Template = "YYYY/YYYY-MM-DD",
+    string Template = "{YYYY}/{YYYY}-{MM}-{DD}",
     bool MoveMode = true,
     bool IncludeSubfolders = true,
     bool ShowFullTree = true);

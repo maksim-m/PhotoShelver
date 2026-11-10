@@ -83,7 +83,7 @@ public class PlacementAndRecoveryTests
         };
         var broken = new SourceFile { Path = @"E:\DCIM\BAD.JPG", Size = 1, LastWriteTimeUtc = DateTime.UtcNow, Kind = MediaKind.Photo, Error = "x" };
 
-        var jobs = ImportPlan.CreateJobs([file, broken], root, FolderTemplate.Parse("YYYY/YYYY-MM-DD"));
+        var jobs = ImportPlan.CreateJobs([file, broken], root, FolderTemplate.Parse("{YYYY}/{YYYY}-{MM}-{DD}"));
 
         var job = Assert.Single(jobs);
         Assert.Equal(@"C:\Library\2026\2026-03-07", job.DestinationFolder);
@@ -95,7 +95,7 @@ public class PlacementAndRecoveryTests
     public void NoValidTemplateEscapesTheTargetRoot()
     {
         var rnd = new Random(2026);
-        string[] pieces = ["YYYY", "YY", "MM", "MMM", "DD", "/", "\\", ".", "..", " ", "-", "a", ":", "C:", "~", "%"];
+        string[] pieces = ["{YYYY}", "{YY}", "{MM}", "{MMM}", "{DD}", "{", "}", "{NAME}", "YYYY", "/", "\\", ".", "..", " ", "-", "a", ":", "C:", "~", "%"];
         var root = @"C:\Library";
         var file = new SourceFile
         {

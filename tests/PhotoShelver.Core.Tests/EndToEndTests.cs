@@ -140,7 +140,7 @@ public class EndToEndTests
         var (dir, source, target) = Setup();
         using var _ = dir;
 
-        await Pipeline.RunAsync(source, target, ImportMode.Copy, template: @"Photos YYYY\MMM");
+        await Pipeline.RunAsync(source, target, ImportMode.Copy, template: @"Photos {YYYY}\{MMM}");
 
         var tree = Snapshot.Take(target).Paths.Select(p => Path.GetDirectoryName(p)!).Distinct().ToList();
         Assert.Equal([@"Photos 2025\Dec", @"Photos 2026\Jan", @"Photos 2026\Jun", @"Photos 2026\Mar", @"Photos 2026\Nov"], tree);

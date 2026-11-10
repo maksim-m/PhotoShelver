@@ -21,7 +21,7 @@ public class EdgeCaseTests
     public void JobsCanTargetADriveRoot(string root)
     {
         var job = Assert.Single(ImportPlan.CreateJobs(
-            [Photo(@"F:\DCIM\IMG.JPG", new DateTime(2026, 3, 7))], root, FolderTemplate.Parse("YYYY/YYYY-MM-DD")));
+            [Photo(@"F:\DCIM\IMG.JPG", new DateTime(2026, 3, 7))], root, FolderTemplate.Parse("{YYYY}/{YYYY}-{MM}-{DD}")));
         Assert.Equal(@"E:\2026\2026-03-07", job.DestinationFolder);
     }
 
@@ -57,7 +57,7 @@ public class EdgeCaseTests
     {
         using var dir = new TempDir();
         var root = dir.Path + "\\"; // trailing slash must not change anything
-        var template = FolderTemplate.Parse("YYYY/YYYY-MM-DD");
+        var template = FolderTemplate.Parse("{YYYY}/{YYYY}-{MM}-{DD}");
         var src = dir.File(@"card\IMG.JPG", "same");
         var file = new SourceFile
         {

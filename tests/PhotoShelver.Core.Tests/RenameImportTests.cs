@@ -18,14 +18,14 @@ public class RenameImportTests
     };
 
     private static List<ImportJob> Plan(string target, string names, params SourceFile[] files) =>
-        ImportPlan.CreateJobs(files, target, FolderTemplate.Parse("YYYY/YYYY-MM-DD"), FileNameTemplate.Parse(names));
+        ImportPlan.CreateJobs(files, target, FolderTemplate.Parse("{YYYY}/{YYYY}-{MM}-{DD}"), FileNameTemplate.Parse(names));
 
     [Fact]
     public void PlanNamesFilesByTheTemplate()
     {
         using var dir = new TempDir();
         var a = File(dir.File(@"card\IMG_2041.JPG", "a"));
-        var jobs = Plan(dir.Sub("lib"), "YYYYMMDD_HHmmss_NAME", a);
+        var jobs = Plan(dir.Sub("lib"), "{YYYY}{MM}{DD}_{HH}{mm}{ss}_{NAME}", a);
 
         var job = Assert.Single(jobs);
         Assert.Equal("20260814_071205_IMG_2041.JPG", job.FileName);
@@ -37,10 +37,10 @@ public class RenameImportTests
     {
         using var dir = new TempDir();
         var a = File(dir.File(@"card\IMG_2041.JPG", "a"));
-        var tpl = FolderTemplate.Parse("YYYY");
+        var tpl = FolderTemplate.Parse("{YYYY}");
 
         Assert.Equal("IMG_2041.JPG", ImportPlan.CreateJobs([a], dir.Path, tpl).Single().FileName);
-        Assert.Equal("IMG_2041.JPG", Plan(dir.Path, "NAME", a).Single().FileName);
+        Assert.Equal("IMG_2041.JPG", Plan(dir.Path, "{NAME}", a).Single().FileName);
     }
 
     [Theory]
@@ -51,7 +51,7 @@ public class RenameImportTests
     {
         using var dir = new TempDir();
         var src = dir.File(@"card\IMG_2041.JPG", "photo");
-        var jobs = Plan(dir.Sub("lib"), "YYYY-MM-DD_NAME", File(src));
+        var jobs = Plan(dir.Sub("lib"), "{YYYY}-{MM}-{DD}_{NAME}", File(src));
 
         var result = new Importer { TreatAsDifferentVolumes = otherVolume }.Run(jobs, mode, null, default);
 
@@ -73,7 +73,7 @@ public class RenameImportTests
         var folder = dir.Sub("lib", "2026", "2026-08-14");
         dir.File(@"lib\2026\2026-08-14\2026-08-14_07-12-05.JPG", "already in the library");
         var src = dir.File(@"card\IMG_2041.JPG", "new shot");
-        var jobs = Plan(Path.Combine(dir.Path, "lib"), "YYYY-MM-DD_HH-mm-ss", File(src));
+        var jobs = Plan(Path.Combine(dir.Path, "lib"), "{YYYY}-{MM}-{DD}_{HH}-{mm}-{ss}", File(src));
 
         var result = new Importer { TreatAsDifferentVolumes = otherVolume }.Run(jobs, mode, null, default);
 
@@ -88,7 +88,7 @@ public class RenameImportTests
     {
         using var dir = new TempDir();
         var files = Enumerable.Range(1, 3).Select(i => File(dir.File($@"card\IMG_{i}.JPG", $"frame {i}"))).ToArray();
-        var jobs = Plan(dir.Sub("lib"), "YYYY-MM-DD_HH-mm-ss", files);
+        var jobs = Plan(dir.Sub("lib"), "{YYYY}-{MM}-{DD}_{HH}-{mm}-{ss}", files);
 
         var result = new Importer().Run(jobs, ImportMode.Move, null, default);
 
@@ -107,7 +107,7 @@ public class RenameImportTests
             File(dir.File(@"card\IMG_0001.CR3", "raw")), File(dir.File(@"card\IMG_0001.JPG", "jpeg")),
             File(dir.File(@"card\IMG_0002.HEIC", "still")), File(dir.File(@"card\IMG_0002.MOV", "motion")),
         };
-        var jobs = Plan(dir.Sub("lib"), "YYYY-MM-DD_NAME", files);
+        var jobs = Plan(dir.Sub("lib"), "{YYYY}-{MM}-{DD}_{NAME}", files);
 
         var result = new Importer().Run(jobs, ImportMode.Copy, null, default);
 
@@ -123,6 +123,9 @@ public class RenameImportTests
     [InlineData("")]
     [InlineData("x.")]
     [InlineData(" x.JPG")]
+    [InlineData("NUL.JPG")]
+    [InlineData("con")]
+    [InlineData("COM1.tar.gz")]
     public void AnInvalidDestinationNameImportsNothingAndKeepsTheSource(string badName)
     {
         // Defence in depth: the planner never makes such names, but the importer refuses them on its own.
@@ -139,6 +142,26 @@ public class RenameImportTests
         Assert.DoesNotContain(Directory.GetFiles(dir.Path, "*", SearchOption.AllDirectories), f => f != src);
     }
 
+    [Theory]
+    [InlineData(ImportMode.Copy, false)]
+    [InlineData(ImportMode.Move, false)]
+    [InlineData(ImportMode.Move, true)]
+    public void ANameTooLongForTheFileSystemImportsNothingAndKeepsTheSource(ImportMode mode, bool otherVolume)
+    {
+        // A valid template with a long original name can exceed 255 characters: the file fails, nothing is lost.
+        using var dir = new TempDir();
+        var src = dir.File($@"card\{new string('n', 120)}.JPG", "photo");
+        var jobs = Plan(dir.Sub("lib"), "{NAME}_" + new string('x', 140), File(src));
+        Assert.True(jobs[0].FileName.Length > 255);
+
+        var result = new Importer { TreatAsDifferentVolumes = otherVolume }.Run(jobs, mode, null, default);
+
+        Assert.Empty(result.Imported);
+        Assert.Single(result.Failures);
+        Assert.Equal("photo", System.IO.File.ReadAllText(src));
+        Assert.DoesNotContain(Directory.GetFiles(dir.Path, "*", SearchOption.AllDirectories), f => f != src);
+    }
+
     [Fact]
     public async Task EndToEndRenamedImportLosesNothing()
     {
@@ -148,7 +171,7 @@ public class RenameImportTests
         var target = dir.Sub("lib");
         var before = new[] { Snapshot.Take(source), Snapshot.Take(target) };
 
-        var outcome = await Pipeline.RunAsync(source, target, ImportMode.Move, names: "YYYYMMDD_HHmmss_NAME",
+        var outcome = await Pipeline.RunAsync(source, target, ImportMode.Move, names: "{YYYY}{MM}{DD}_{HH}{mm}{ss}_{NAME}",
             importer: new Importer { TreatAsDifferentVolumes = true });
 
         Assert.NotEmpty(outcome.Result.Imported);
@@ -164,7 +187,7 @@ public class RenameImportTests
         // The same card again: the renamed files are recognised by content as already imported.
         var card2 = dir.Sub("card2");
         Fixtures.CopyTo(card2);
-        var rerun = await Pipeline.RunAsync(card2, target, ImportMode.Copy, names: "YYYYMMDD_HHmmss_NAME");
+        var rerun = await Pipeline.RunAsync(card2, target, ImportMode.Copy, names: "{YYYY}{MM}{DD}_{HH}{mm}{ss}_{NAME}");
         Assert.Empty(rerun.Jobs);
     }
 
@@ -173,8 +196,8 @@ public class RenameImportTests
     {
         using var dir = new TempDir();
         var log = ImportLog.Start(Path.Combine(dir.Path, "logs"), ImportMode.Copy, "s", "t", "YYYY", [], "1",
-            nameTemplate: "YYYY-MM-DD_NAME");
-        Assert.Contains("Имена:    YYYY-MM-DD_NAME", System.IO.File.ReadAllLines(log.Path));
+            nameTemplate: "{YYYY}-{MM}-{DD}_{NAME}");
+        Assert.Contains("Имена:    {YYYY}-{MM}-{DD}_{NAME}", System.IO.File.ReadAllLines(log.Path));
 
         var plain = ImportLog.Start(Path.Combine(dir.Path, "logs2"), ImportMode.Copy, "s", "t", "YYYY", [], "1");
         Assert.DoesNotContain(System.IO.File.ReadAllLines(plain.Path), l => l.StartsWith("Имена", StringComparison.Ordinal));

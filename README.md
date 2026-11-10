@@ -20,8 +20,8 @@ PhotoShelver does one job:
 
 - **Sorted by the real capture date.** EXIF for photos; for videos the camera's own clock (Canon), Apple's date with time zone, or the GPS position's time zone — so photos and videos from one moment land in the same folder. Files without metadata fall back to the modification date (and are marked).
 - **Duplicates are recognised by content.** Files that are already in the library (from an earlier import) or appear twice on the card are dimmed and not selected — detected by a 128-bit content hash, not by name.
-- **Your folder scheme.** `YYYY/YYYY-MM-DD` by default, or any template with `YYYY`, `YY`, `MM`, `MMM`, `DD` and `/`; mistakes are explained as you type.
-- **Optional renaming.** Under *Advanced*: a file name template such as `YYYY-MM-DD_NAME` → `2026-08-14_IMG_2041.JPG` (date, time `HH mm ss`, original name `NAME`). Off by default; when on, it stays visible even with the section collapsed.
+- **Your folder scheme.** `{YYYY}/{YYYY}-{MM}-{DD}` by default, or any template with `{YYYY}`, `{YY}`, `{MM}`, `{MMM}`, `{DD}` and `/` — text outside the braces is kept as is; mistakes are explained as you type, and an invalid template never lets the import start.
+- **Optional renaming.** Under *Advanced*: a file name template such as `{YYYY}-{MM}-{DD}_{NAME}` → `2026-08-14_IMG_2041.JPG` (date, time `{HH}{mm}{ss}`, original name `{NAME}`). Off by default; when on, it stays visible even with the section collapsed.
 - **RAW-friendly.** Thumbnails for CR2, CR3, NEF, ARW, DNG, RAF, ORF, RW2 come from the preview the camera embedded — fast and without installing codecs. TIFF scans are shown upright.
 - **Fast on big cards.** Thousands of files are scanned in seconds; thumbnails load for what is on screen first.
 - **Native look.** Windows 11 Fluent design, light and dark theme, English and Russian interface (follows the Windows display language).

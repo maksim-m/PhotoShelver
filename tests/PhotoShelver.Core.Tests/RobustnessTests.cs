@@ -88,7 +88,7 @@ public class RobustnessTests
 
         using (new FileStream(locked, FileMode.Open, FileAccess.Read, FileShare.None))
         {
-            var result = DuplicateDetector.Detect([file], Path.Combine(dir.Path, "target"), FolderTemplate.Parse("YYYY/MM-DD"), new HashCache(), null, default);
+            var result = DuplicateDetector.Detect([file], Path.Combine(dir.Path, "target"), FolderTemplate.Parse("{YYYY}/{MM}-{DD}"), new HashCache(), null, default);
             Assert.Equal(DuplicateState.New, result[file].State); // cannot prove it is a duplicate → treat as new
         }
     }

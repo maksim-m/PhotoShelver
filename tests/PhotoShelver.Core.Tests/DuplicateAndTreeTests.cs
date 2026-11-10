@@ -6,7 +6,7 @@ namespace PhotoShelver.Core.Tests;
 
 public class DuplicateAndTreeTests
 {
-    private static readonly FolderTemplate Template = FolderTemplate.Parse("YYYY/MM-DD");
+    private static readonly FolderTemplate Template = FolderTemplate.Parse("{YYYY}/{MM}-{DD}");
 
     private static SourceFile Src(string path, DateTime date)
     {

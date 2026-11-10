@@ -80,9 +80,17 @@ public sealed class LanguageTests : IDisposable
         L.IsRussian = false;
         Assert.False(FolderTemplate.TryParse("", out _, out var empty));
         Assert.Equal("The template is empty", empty);
-        Assert.False(FolderTemplate.TryParse("yyyy/mm", out _, out var lower));
-        Assert.StartsWith("Tokens are written in capitals", lower);
-        Assert.True(FolderTemplate.TryParse("DD", out var template, out _));
+        Assert.False(FolderTemplate.TryParse("{yyyy}/{MM}", out _, out var lower));
+        Assert.Equal("Write it as {YYYY} (letter case matters)", lower);
+        Assert.False(FolderTemplate.TryParse("YYYY/MM", out _, out var bare));
+        Assert.Equal("Tokens are written in braces: {YYYY}", bare);
+        Assert.False(FolderTemplate.TryParse("{YYYY", out _, out var open));
+        Assert.Equal("Missing “}”", open);
+        Assert.False(FileNameTemplate.TryParse("{YYYY}/{NAME}", out _, out var slash));
+        Assert.StartsWith("A file name cannot contain", slash);
+        Assert.True(FileNameTemplate.TryParse("{YYYY}", out var names, out _));
+        Assert.StartsWith("Without {NAME}", names!.Warning);
+        Assert.True(FolderTemplate.TryParse("{DD}", out var template, out _));
         Assert.StartsWith("No month", template!.Warning);
     }
 
@@ -92,9 +100,9 @@ public sealed class LanguageTests : IDisposable
         // Only the interface is translated: the same template must give the same folders in any language.
         var date = new DateTime(2026, 11, 9);
         L.IsRussian = true;
-        var russian = FolderTemplate.Parse("YYYY/MMM-DD").Format(date);
+        var russian = FolderTemplate.Parse("{YYYY}/{MMM}-{DD}").Format(date);
         L.IsRussian = false;
-        var english = FolderTemplate.Parse("YYYY/MMM-DD").Format(date);
+        var english = FolderTemplate.Parse("{YYYY}/{MMM}-{DD}").Format(date);
         Assert.Equal(russian, english);
         Assert.Equal(@"2026\Nov-09", english);
     }

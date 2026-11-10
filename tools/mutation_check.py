@@ -25,6 +25,7 @@ IMP = os.path.join("src", "PhotoShelver.Core", "Importing", "Importer.cs")
 DUP = os.path.join("src", "PhotoShelver.Core", "Scanning", "DuplicateDetector.cs")
 CDR = os.path.join("src", "PhotoShelver.Core", "Metadata", "CaptureDateReader.cs")
 FNT = os.path.join("src", "PhotoShelver.Core", "FileNameTemplate.cs")
+SYN = os.path.join("src", "PhotoShelver.Core", "TemplateSyntax.cs")
 
 # (description, file, original snippet, mutated snippet)
 MUTATIONS = [
@@ -126,8 +127,20 @@ MUTATIONS = [
      "if (!IsPlainFileName(job.FileName))",
      "if (false)"),
     ("file name template drops the extension", FNT,
-     "return sb + Path.GetExtension(originalFileName);",
-     "return sb.ToString();"),
+     "originalFileName : name + extension;",
+     "originalFileName : name;"),
+    ("generated name keeps spaces at its ends", FNT,
+     "var name = sb.ToString().Trim();",
+     "var name = sb.ToString();"),
+    ("unknown token in braces accepted", SYN,
+     "if (!allowed.Contains(name))",
+     "if (false)"),
+    ("unclosed brace accepted", SYN,
+     "if (close < 0 || (nextOpen >= 0 && nextOpen < close))",
+     "if (close < 0)"),
+    ("importer accepts a device name (NUL.JPG)", IMP,
+     "&& !FolderTemplate.ReservedNames.Contains(name.Split('.')[0]);",
+     ";"),
     ("file name template accepts folders", FNT,
      "if (pattern.IndexOfAny(['/', '\\\\']) >= 0)",
      "if (false)"),

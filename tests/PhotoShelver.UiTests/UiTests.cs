@@ -16,7 +16,7 @@ namespace PhotoShelver.UiTests;
 [Trait("Category", "UI")]
 public class UiTests
 {
-    private const string Template = "YYYY/YYYY-MM-DD";
+    private const string Template = "{YYYY}/{YYYY}-{MM}-{DD}";
 
     private sealed class Workspace : IDisposable
     {
@@ -176,14 +176,22 @@ public class UiTests
         app.WaitReady();
         Assert.True(app.ImportEnabled);
 
-        app.SetTemplate("yyyy/mm");
-        app.WaitUntil(() => app.Text("TemplateError") is { } e && e.Contains("заглавными"), "template error");
+        app.SetTemplate("YYYY/MM");
+        app.WaitUntil(() => app.Text("TemplateError") is { } e && e.Contains("фигурных скобках"), "old syntax error");
         Assert.False(app.ImportEnabled);
 
-        app.SetTemplate("MM-DD");
+        app.SetTemplate("{yyyy}/{MM}");
+        app.WaitUntil(() => app.Text("TemplateError") is { } e && e.Contains("{YYYY}"), "letter case error");
+        Assert.False(app.ImportEnabled);
+
+        app.SetTemplate("{YYYY}/{MM");
+        app.WaitUntil(() => app.Text("TemplateError") is { } e && e.Contains("Не хватает «}»"), "unclosed brace error");
+        Assert.False(app.ImportEnabled);
+
+        app.SetTemplate("{MM}-{DD}");
         app.WaitUntil(() => app.Text("TemplateWarning") is { } w && w.Contains("Нет года"), "template warning");
 
-        app.SetTemplate("YYYY/MM");
+        app.SetTemplate("{YYYY}/{MM}");
         app.WaitUntil(() => app.ImportEnabled, "import enabled with the new template");
         Assert.Null(app.Text("TemplateError"));
         app.WaitUntil(() => app.TreeNodes().Any(n => n.StartsWith("11 +", StringComparison.Ordinal)), "month folder in the tree");
@@ -204,11 +212,11 @@ public class UiTests
         app.WaitReady();
         Assert.Equal("Дополнительно", app.AdvancedHeader); // default: original names, nothing to show
 
-        app.SetNameTemplate("YYYY/NAME");
+        app.SetNameTemplate("{YYYY}/{NAME}");
         app.WaitUntil(() => app.Text("NameTemplateError") is { } e && e.Contains("папки задаются"), "name template error");
         Assert.False(app.ImportEnabled);
 
-        app.SetNameTemplate("YYYY-MM-DD_NAME");
+        app.SetNameTemplate("{YYYY}-{MM}-{DD}_{NAME}");
         app.WaitUntil(() => app.ImportEnabled, "import enabled with a valid name template");
         Assert.EndsWith("_IMG_2041.JPG", app.Text("NameTemplateExample"));
         app.CollapseAdvanced();
@@ -231,13 +239,13 @@ public class UiTests
         }
 
         var log = Assert.Single(Directory.GetFiles(Path.Combine(ws.Root, "logs"), "import-*.log"));
-        Assert.Contains("Имена:    YYYY-MM-DD_NAME", File.ReadAllLines(log));
+        Assert.Contains("Имена:    {YYYY}-{MM}-{DD}_{NAME}", File.ReadAllLines(log));
 
         // The template is remembered.
         app.WaitReady();
         app.CloseGracefully();
         using var json = JsonDocument.Parse(File.ReadAllText(app.SettingsPath));
-        Assert.Equal("YYYY-MM-DD_NAME", json.RootElement.GetProperty("NameTemplate").GetString());
+        Assert.Equal("{YYYY}-{MM}-{DD}_{NAME}", json.RootElement.GetProperty("NameTemplate").GetString());
     }
 
     // ------------------------------------------------------------------ selection
@@ -408,13 +416,13 @@ public class UiTests
         using var app = new AppSession(new UiSettings(ws.Card, ws.Library), ws.Root);
         app.WaitReady();
 
-        app.SetTemplate("YYYY/MM/DD");
+        app.SetTemplate("{YYYY}/{MM}/{DD}");
         AppSession.Select(app.Find("ModeCopy"));
         app.WaitUntil(() => app.ImportEnabled, "recheck after the template change");
         app.CloseGracefully();
 
         using var json = JsonDocument.Parse(File.ReadAllText(app.SettingsPath));
-        Assert.Equal("YYYY/MM/DD", json.RootElement.GetProperty("Template").GetString());
+        Assert.Equal("{YYYY}/{MM}/{DD}", json.RootElement.GetProperty("Template").GetString());
         Assert.False(json.RootElement.GetProperty("MoveMode").GetBoolean());
         Assert.Equal(ws.Card, json.RootElement.GetProperty("SourcePath").GetString());
     }
