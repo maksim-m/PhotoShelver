@@ -54,29 +54,28 @@ public sealed class FileNameTemplate
         pattern = pattern?.Trim() ?? "";
         if (pattern.Length == 0)
         {
-            error = L.T("The template is empty", "Шаблон пустой");
+            error = Strings.TheTemplateIsEmpty;
             return false;
         }
         if (pattern.Length > MaxLength)
         {
-            error = L.T($"The template is too long (more than {MaxLength} characters)", $"Шаблон слишком длинный (больше {MaxLength} символов)");
+            error = L.F(Strings.TheTemplateIsTooLongMoreThan, MaxLength);
             return false;
         }
         if (pattern.IndexOfAny(['/', '\\']) >= 0)
         {
-            error = L.T("A file name cannot contain / or \\ — folders are set by the folder template",
-                "В имени файла не может быть / и \\ — папки задаются шаблоном папок");
+            error = Strings.AFileNameCannotContainOrFolders;
             return false;
         }
         var bad = pattern.IndexOfAny(FolderTemplate.InvalidChars);
         if (bad >= 0 || pattern.Any(char.IsControl))
         {
-            error = L.T("Invalid character: ", "Недопустимый символ: ") + (bad >= 0 ? pattern[bad].ToString() : L.T("control character", "управляющий символ"));
+            error = Strings.InvalidCharacter + (bad >= 0 ? pattern[bad].ToString() : Strings.ControlCharacter);
             return false;
         }
         if (pattern.EndsWith('.'))
         {
-            error = L.T("A file name cannot end with a dot", "Имя файла не может заканчиваться точкой");
+            error = Strings.AFileNameCannotEndWithA;
             return false;
         }
         if (!TemplateSyntax.TryTokenize(pattern, Tokens, Elsewhere, out var parts, out error))
@@ -85,9 +84,8 @@ public sealed class FileNameTemplate
         if (!parts.Any(p => p.IsToken))
         {
             error = TemplateSyntax.BareToken(parts, Tokens) is { } bare
-                ? L.T($"Tokens are written in braces: {{{bare}}}", $"Токены пишутся в фигурных скобках: {{{bare}}}")
-                : L.T($"The template has no tokens, so every file would get the same name. Add {{NAME}} or a date: {TemplateSyntax.List(Tokens)}",
-                    $"В шаблоне нет ни одного токена — все файлы получили бы одно имя. Добавьте {{NAME}} или дату: {TemplateSyntax.List(Tokens)}");
+                ? L.F(Strings.TokensAreWrittenInBraces, bare)
+                : L.F(Strings.TheTemplateHasNoTokensSoEvery, TemplateSyntax.List(Tokens));
             return false;
         }
 
@@ -95,7 +93,7 @@ public sealed class FileNameTemplate
         var sample = Path.GetFileNameWithoutExtension(candidate.Format(new DateTime(2026, 1, 1, 10, 0, 0), "IMG_0001.JPG"));
         if (FolderTemplate.ReservedNames.Contains(sample))
         {
-            error = L.T($"Reserved Windows name: “{sample}”", $"Зарезервированное имя Windows: «{sample}»");
+            error = L.F(Strings.ReservedWindowsName, sample);
             return false;
         }
 
@@ -108,16 +106,14 @@ public sealed class FileNameTemplate
     {
         var tokens = parts.Where(p => p.IsToken).Select(p => p.Token!).ToList();
         if (TemplateSyntax.BareToken(parts, Tokens) is { } bare)
-            return L.T($"“{bare}” without braces is plain text; the token is written {{{bare}}}",
-                $"«{bare}» без скобок — это просто текст; токен пишется {{{bare}}}");
+            return L.F(Strings.WithoutBracesIsPlainTextTheToken, bare);
         if (tokens.Contains("mm") && !tokens.Contains("HH"))
-            return L.T("{mm} is minutes (without hours); the month is {MM}", "{mm} — это минуты (а часов нет); месяц — {MM}");
+            return Strings.MmIsMinutesWithoutHoursTheMonth;
         if (tokens.Contains("HH") && tokens.Contains("MM") && !tokens.Contains("mm")
             && tokens.IndexOf("MM") > tokens.IndexOf("HH"))
-            return L.T("{MM} after the hours is the month; minutes are {mm}", "{MM} после часов — это месяц; минуты — {mm}");
+            return Strings.MMAfterTheHoursIsTheMonth;
         if (!tokens.Contains("NAME"))
-            return L.T("Without {NAME}, shots taken in the same second (or on the same day, without time) get the same name: _1, _2… are added, and RAW+JPEG or Live Photo pairs may get different numbers",
-                "Без {NAME} у снимков одной секунды (или одного дня, если нет времени) имена совпадут: добавятся _1, _2…, и пары RAW+JPEG или Live Photo могут получить разные номера");
+            return Strings.WithoutNAMEShotsTakenInTheSame;
         return null;
     }
 

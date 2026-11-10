@@ -1,0 +1,611 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <data name="AnUnexpectedInterfaceErrorOccurredTheApp" xml:space="preserve">
+    <value>An unexpected interface error occurred. The app keeps running.
+
+{0}
+
+Details: {1}</value>
+  </data>
+  <data name="LongDateTimeFormat" xml:space="preserve">
+    <value>MMMM d, yyyy, HH:mm:ss</value>
+  </data>
+  <data name="LongDateFormat" xml:space="preserve">
+    <value>MMMM d, yyyy</value>
+  </data>
+  <data name="DurationHoursMinutes" xml:space="preserve">
+    <value>~{0} h {1} min</value>
+  </data>
+  <data name="DurationMinutes" xml:space="preserve">
+    <value>~{0} min</value>
+  </data>
+  <data name="T1Min" xml:space="preserve">
+    <value>&lt; 1 min</value>
+  </data>
+  <data name="B" xml:space="preserve">
+    <value> B</value>
+  </data>
+  <data name="KB" xml:space="preserve">
+    <value> KB</value>
+  </data>
+  <data name="MB" xml:space="preserve">
+    <value> MB</value>
+  </data>
+  <data name="GB" xml:space="preserve">
+    <value> GB</value>
+  </data>
+  <data name="TheImportLogCouldNotBeWritten" xml:space="preserve">
+    <value>The import log could not be written completely: {0}</value>
+  </data>
+  <data name="TheRemainingFilesWereNotTouched" xml:space="preserve">
+    <value> The remaining files were not touched.</value>
+  </data>
+  <data name="DialogErrors" xml:space="preserve">
+    <value> Errors: {0}.</value>
+  </data>
+  <data name="SecondCopies" xml:space="preserve">
+    <value> Second copies: {0}.</value>
+  </data>
+  <data name="DialogImported" xml:space="preserve">
+    <value>Imported: {0}.</value>
+  </data>
+  <data name="ImportFinishedWithWarnings" xml:space="preserve">
+    <value>Import finished with warnings</value>
+  </data>
+  <data name="ImportFinishedWithErrors" xml:space="preserve">
+    <value>Import finished with errors</value>
+  </data>
+  <data name="ImportCancelled" xml:space="preserve">
+    <value>Import cancelled</value>
+  </data>
+  <data name="ImportInProgressWaitUntilItFinishes" xml:space="preserve">
+    <value>Import in progress. Wait until it finishes or press “Cancel”.</value>
+  </data>
+  <data name="Close" xml:space="preserve">
+    <value>Close</value>
+  </data>
+  <data name="OpenTargetFolder" xml:space="preserve">
+    <value>Open target folder</value>
+  </data>
+  <data name="OpenLog" xml:space="preserve">
+    <value>Open log</value>
+  </data>
+  <data name="ImportFinished" xml:space="preserve">
+    <value>Import finished</value>
+  </data>
+  <data name="Cancel" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="Import" xml:space="preserve">
+    <value>Import</value>
+  </data>
+  <data name="Copy" xml:space="preserve">
+    <value>Copy</value>
+  </data>
+  <data name="Move" xml:space="preserve">
+    <value>Move</value>
+  </data>
+  <data name="CopyInsteadOfMoving" xml:space="preserve">
+    <value>Copy instead of moving</value>
+  </data>
+  <data name="Delete" xml:space="preserve">
+    <value>Delete</value>
+  </data>
+  <data name="Show" xml:space="preserve">
+    <value>Show</value>
+  </data>
+  <data name="ShowTheWholeTree" xml:space="preserve">
+    <value>Show the whole tree</value>
+  </data>
+  <data name="EveryImportedFileIsAlsoCopiedHere" xml:space="preserve">
+    <value>Every imported file is also copied here and verified. When moving, the source is deleted only after both copies are verified</value>
+  </data>
+  <data name="ACopyOfTheLibraryTheSame" xml:space="preserve">
+    <value>A copy of the library: the same date folders and file names</value>
+  </data>
+  <data name="ANewFolderForEachImportFiles" xml:space="preserve">
+    <value>A new folder for each import, files as on the card (same subfolders and names)</value>
+  </data>
+  <data name="SecondCopy" xml:space="preserve">
+    <value>Second copy</value>
+  </data>
+  <data name="NAMEOriginalNameYYYYMMDDHH" xml:space="preserve">
+    <value>{NAME} — original name · {YYYY} · {MM} · {DD} · {HH} · {mm} · {ss}</value>
+  </data>
+  <data name="TokensInBracesNAMETheOriginalName" xml:space="preserve">
+    <value>Tokens in braces: {NAME} — the original name ({NAME} alone keeps names as they are), {YYYY}, {YY}, {MM}, {MMM}, {DD} — date, {HH}, {mm}, {ss} — time of the shot. Text outside braces is kept as is; the extension is always kept</value>
+  </data>
+  <data name="FileNames" xml:space="preserve">
+    <value>File names</value>
+  </data>
+  <data name="Advanced" xml:space="preserve">
+    <value>Advanced</value>
+  </data>
+  <data name="YYYYYYMMMMMDDNewLevel" xml:space="preserve">
+    <value>{YYYY} · {YY} · {MM} · {MMM} · {DD} · / — new level</value>
+  </data>
+  <data name="PickAPresetOrTypeYourOwn" xml:space="preserve">
+    <value>Pick a preset or type your own. Tokens in braces: {YYYY} — year, {YY} — year (2 digits), {MM} — month, {MMM} — month (Jan…Dec), {DD} — day; / — subfolder. Text outside braces is kept as is</value>
+  </data>
+  <data name="FolderTemplate" xml:space="preserve">
+    <value>Folder template</value>
+  </data>
+  <data name="Target" xml:space="preserve">
+    <value>Target</value>
+  </data>
+  <data name="CollapseOrExpand" xml:space="preserve">
+    <value>Collapse or expand</value>
+  </data>
+  <data name="DaySelection" xml:space="preserve">
+    <value>Day selection</value>
+  </data>
+  <data name="ImportThisFile" xml:space="preserve">
+    <value>Import this file</value>
+  </data>
+  <data name="ShowInFolder" xml:space="preserve">
+    <value>Show in folder</value>
+  </data>
+  <data name="Open" xml:space="preserve">
+    <value>Open</value>
+  </data>
+  <data name="ClearSelection" xml:space="preserve">
+    <value>Clear selection</value>
+  </data>
+  <data name="SelectAllNew" xml:space="preserve">
+    <value>Select all new</value>
+  </data>
+  <data name="IncludeSubfolders" xml:space="preserve">
+    <value>Include subfolders</value>
+  </data>
+  <data name="ExpandAllDays" xml:space="preserve">
+    <value>Expand all days</value>
+  </data>
+  <data name="ExpandAll" xml:space="preserve">
+    <value>Expand all</value>
+  </data>
+  <data name="CollapseAllDays" xml:space="preserve">
+    <value>Collapse all days</value>
+  </data>
+  <data name="CollapseAll" xml:space="preserve">
+    <value>Collapse all</value>
+  </data>
+  <data name="Browse" xml:space="preserve">
+    <value>Browse…</value>
+  </data>
+  <data name="Source" xml:space="preserve">
+    <value>Source</value>
+  </data>
+  <data name="NoNewFilesOnThisDay" xml:space="preserve">
+    <value>No new files on this day</value>
+  </data>
+  <data name="SelectAllNewFilesOfThisDay" xml:space="preserve">
+    <value>Select all new files of this day / clear the selection</value>
+  </data>
+  <data name="Selected" xml:space="preserve">
+    <value>selected</value>
+  </data>
+  <data name="TheSourceAndTheTargetMustNot" xml:space="preserve">
+    <value>The source and the target must not be the same folder or inside one another</value>
+  </data>
+  <data name="TheTargetFolderIsOnAWrite" xml:space="preserve">
+    <value>The target folder is on a write-protected drive</value>
+  </data>
+  <data name="TargetFolderNotFound" xml:space="preserve">
+    <value>Target folder not found</value>
+  </data>
+  <data name="SourceFolderNotFound" xml:space="preserve">
+    <value>Source folder not found</value>
+  </data>
+  <data name="NoFilesToImport" xml:space="preserve">
+    <value>No files to import</value>
+  </data>
+  <data name="NoPhotosOrVideosInTheSource" xml:space="preserve">
+    <value>No photos or videos in the source</value>
+  </data>
+  <data name="ChooseASourceToSeeWhereThe" xml:space="preserve">
+    <value>Choose a source to see where the files will go</value>
+  </data>
+  <data name="ReadingTheSourceFiles" xml:space="preserve">
+    <value>Reading the source files…</value>
+  </data>
+  <data name="BuildingTheFolderTree" xml:space="preserve">
+    <value>Building the folder tree…</value>
+  </data>
+  <data name="ChooseTheFolderToImportTo" xml:space="preserve">
+    <value>Choose the folder to import to</value>
+  </data>
+  <data name="SkippedOfOtherTypes" xml:space="preserve">
+    <value>Skipped {0} of other types</value>
+  </data>
+  <data name="SummarySelected" xml:space="preserve">
+    <value>Selected {0}</value>
+  </data>
+  <data name="SummaryErrors" xml:space="preserve">
+    <value>Errors {0}</value>
+  </data>
+  <data name="DuplicatesInSource" xml:space="preserve">
+    <value>Duplicates in source {0}</value>
+  </data>
+  <data name="AlreadyInTarget" xml:space="preserve">
+    <value>Already in target {0}</value>
+  </data>
+  <data name="New" xml:space="preserve">
+    <value>New {0}</value>
+  </data>
+  <data name="Total" xml:space="preserve">
+    <value>Total {0}</value>
+  </data>
+  <data name="CouldNotBeRead" xml:space="preserve">
+    <value>Could not be read</value>
+  </data>
+  <data name="CouldNotCheckForDuplicatesImportIs" xml:space="preserve">
+    <value>Could not check for duplicates, import is unavailable: {0}</value>
+  </data>
+  <data name="CheckingForDuplicates" xml:space="preserve">
+    <value>Checking for duplicates…</value>
+  </data>
+  <data name="CouldNotReadTheSourceFolder" xml:space="preserve">
+    <value>Could not read the source folder: {0}</value>
+  </data>
+  <data name="NoPhotosOrVideosInThisFolder" xml:space="preserve">
+    <value>No photos or videos in this folder</value>
+  </data>
+  <data name="ReadingMetadataOf" xml:space="preserve">
+    <value>Reading metadata: {0} of {1}</value>
+  </data>
+  <data name="LookingForFiles" xml:space="preserve">
+    <value>Looking for files…</value>
+  </data>
+  <data name="FolderNotFound" xml:space="preserve">
+    <value>Folder not found</value>
+  </data>
+  <data name="TheImportStoppedBecauseOfAnUnexpected" xml:space="preserve">
+    <value>The import stopped because of an unexpected error: {0}</value>
+  </data>
+  <data name="Left" xml:space="preserve">
+    <value> · {0} left</value>
+  </data>
+  <data name="ImportingOfOf" xml:space="preserve">
+    <value>Importing: {0} of {1} · {2} of {3}</value>
+  </data>
+  <data name="Importing0Of" xml:space="preserve">
+    <value>Importing: 0 of {0}</value>
+  </data>
+  <data name="NotEnoughSpaceForTheSecondCopy" xml:space="preserve">
+    <value>Not enough space for the second copy: {0} needed, {1} free.</value>
+  </data>
+  <data name="NotEnoughSpaceOnTheTargetDrive" xml:space="preserve">
+    <value>Not enough space on the target drive: {0} needed, {1} free.</value>
+  </data>
+  <data name="TheSourceDriveIsWriteProtectedE" xml:space="preserve">
+    <value>The source drive is write-protected (e.g. the lock switch of a memory card) — files cannot be moved.</value>
+  </data>
+  <data name="CouldNotPrepareTheImport" xml:space="preserve">
+    <value>Could not prepare the import: {0}</value>
+  </data>
+  <data name="TheSecondCopyIsOnButIts" xml:space="preserve">
+    <value>the second copy is on, but its folder is not set</value>
+  </data>
+  <data name="CancellingTheCurrentFileWillBeFinished" xml:space="preserve">
+    <value>Cancelling… the current file will be finished</value>
+  </data>
+  <data name="TargetFolderImportTo" xml:space="preserve">
+    <value>Target folder (import to)</value>
+  </data>
+  <data name="SourceFolderImportFrom" xml:space="preserve">
+    <value>Source folder (import from)</value>
+  </data>
+  <data name="ChooseAFolderWithPhotosAndVideos" xml:space="preserve">
+    <value>Choose a folder with photos and videos</value>
+  </data>
+  <data name="CouldNotDelete" xml:space="preserve">
+    <value>Could not delete {0}: {1}</value>
+  </data>
+  <data name="OnlyFilesNamedLikeNameXxxxxxxxImporting" xml:space="preserve">
+    <value>Only files named like “name.xxxxxxxx.importing” are deleted. Photos and videos are not touched.</value>
+  </data>
+  <data name="DeleteImportingLeftOverFromAnInterrupted" xml:space="preserve">
+    <value>Delete {0} *.importing left over from an interrupted import?</value>
+  </data>
+  <data name="CouldNotOpen" xml:space="preserve">
+    <value>Could not open “{0}”: {1}</value>
+  </data>
+  <data name="FileNotFoundPerhapsAlreadyMoved" xml:space="preserve">
+    <value>File not found (perhaps already moved): {0}</value>
+  </data>
+  <data name="TheTargetFolderOrTheSecondCopy" xml:space="preserve">
+    <value>The target folder (or the second copy) has {0} from an interrupted import (*.importing). These are redundant unfinished copies: their sources were not deleted.</value>
+  </data>
+  <data name="FolderNotChosen" xml:space="preserve">
+    <value>folder not chosen</value>
+  </data>
+  <data name="AdvancedSecondCopy" xml:space="preserve">
+    <value>second copy — </value>
+  </data>
+  <data name="AdvancedNames" xml:space="preserve">
+    <value>names — </value>
+  </data>
+  <data name="ErrorInTheFileNameTemplate" xml:space="preserve">
+    <value>error in the file name template</value>
+  </data>
+  <data name="BackupOnSourceDrive" xml:space="preserve">
+    <value>The second copy is on the same drive as the source</value>
+  </data>
+  <data name="BackupOnLibraryDrive" xml:space="preserve">
+    <value>The second copy is on the same drive as the library: if the drive fails, both are lost</value>
+  </data>
+  <data name="Example" xml:space="preserve">
+    <value>Example: </value>
+  </data>
+  <data name="BackupInsideTarget" xml:space="preserve">
+    <value>The second copy must not be in the target folder (or contain it)</value>
+  </data>
+  <data name="BackupInsideSource" xml:space="preserve">
+    <value>The second copy must not be in the source folder (or contain it)</value>
+  </data>
+  <data name="BackupFolderWriteProtected" xml:space="preserve">
+    <value>The folder for the second copy is on a write-protected drive</value>
+  </data>
+  <data name="BackupFolderNotFound" xml:space="preserve">
+    <value>The folder for the second copy is not found</value>
+  </data>
+  <data name="ChooseAFolderForTheSecondCopy" xml:space="preserve">
+    <value>Choose a folder for the second copy (Advanced)</value>
+  </data>
+  <data name="FolderForTheSecondCopy" xml:space="preserve">
+    <value>Folder for the second copy</value>
+  </data>
+  <data name="DuplicateOfASourceFile" xml:space="preserve">
+    <value>Duplicate of a source file: </value>
+  </data>
+  <data name="AlreadyImported" xml:space="preserve">
+    <value>Already imported: </value>
+  </data>
+  <data name="TheCaptureTimeZoneIsUnknownThis" xml:space="preserve">
+    <value>The capture time zone is unknown — this computer's time zone is used</value>
+  </data>
+  <data name="NoCaptureDateInTheMetadataThe" xml:space="preserve">
+    <value>No capture date in the metadata — the file modification date is used</value>
+  </data>
+  <data name="ReadError" xml:space="preserve">
+    <value>Read error: {0}</value>
+  </data>
+  <data name="WithoutNAMEShotsTakenInTheSame" xml:space="preserve">
+    <value>Without {NAME}, shots taken in the same second (or on the same day, without time) get the same name: _1, _2… are added, and RAW+JPEG or Live Photo pairs may get different numbers</value>
+  </data>
+  <data name="MMAfterTheHoursIsTheMonth" xml:space="preserve">
+    <value>{MM} after the hours is the month; minutes are {mm}</value>
+  </data>
+  <data name="MmIsMinutesWithoutHoursTheMonth" xml:space="preserve">
+    <value>{mm} is minutes (without hours); the month is {MM}</value>
+  </data>
+  <data name="WithoutBracesIsPlainTextTheToken" xml:space="preserve">
+    <value>“{0}” without braces is plain text; the token is written {{{0}}}</value>
+  </data>
+  <data name="ReservedWindowsName" xml:space="preserve">
+    <value>Reserved Windows name: “{0}”</value>
+  </data>
+  <data name="TheTemplateHasNoTokensSoEvery" xml:space="preserve">
+    <value>The template has no tokens, so every file would get the same name. Add {{NAME}} or a date: {0}</value>
+  </data>
+  <data name="TokensAreWrittenInBraces" xml:space="preserve">
+    <value>Tokens are written in braces: {{{0}}}</value>
+  </data>
+  <data name="AFileNameCannotEndWithA" xml:space="preserve">
+    <value>A file name cannot end with a dot</value>
+  </data>
+  <data name="ControlCharacter" xml:space="preserve">
+    <value>control character</value>
+  </data>
+  <data name="InvalidCharacter" xml:space="preserve">
+    <value>Invalid character: </value>
+  </data>
+  <data name="AFileNameCannotContainOrFolders" xml:space="preserve">
+    <value>A file name cannot contain / or \ — folders are set by the folder template</value>
+  </data>
+  <data name="TheTemplateIsTooLongMoreThan" xml:space="preserve">
+    <value>The template is too long (more than {0} characters)</value>
+  </data>
+  <data name="TheTemplateIsEmpty" xml:space="preserve">
+    <value>The template is empty</value>
+  </data>
+  <data name="NoYearYYYYOrYYFilesFrom" xml:space="preserve">
+    <value>No year ({YYYY} or {YY}): files from the same month of different years share a folder</value>
+  </data>
+  <data name="NoMonthMMOrMMMFilesFrom" xml:space="preserve">
+    <value>No month ({MM} or {MMM}): files from the same day of different months share a folder</value>
+  </data>
+  <data name="AFolderNameCannotStartWithA" xml:space="preserve">
+    <value>A folder name cannot start with a space or end with a space or a dot</value>
+  </data>
+  <data name="InvalidFolderName" xml:space="preserve">
+    <value>Invalid folder name: “{0}”</value>
+  </data>
+  <data name="EmptyFolderLevelExtraSlash" xml:space="preserve">
+    <value>Empty folder level (extra slash)</value>
+  </data>
+  <data name="TheTemplateHasNoDateAddAt" xml:space="preserve">
+    <value>The template has no date. Add at least one token: {0}</value>
+  </data>
+  <data name="MmIsMinutesForFileNamesOnly" xml:space="preserve">
+    <value>{mm} is minutes (for file names only); the month is {MM}</value>
+  </data>
+  <data name="IsForFileNamesOnlyFoldersUse" xml:space="preserve">
+    <value>{{{0}}} is for file names only; folders use the date: {1}</value>
+  </data>
+  <data name="NotAnImportTempFileNotDeleted" xml:space="preserve">
+    <value>Not an import temp file — not deleted</value>
+  </data>
+  <data name="LogSecondCopy" xml:space="preserve">
+    <value> + second copy {0}</value>
+  </data>
+  <data name="MovedByRenamingOnTheSameDrive" xml:space="preserve">
+    <value>, moved by renaming on the same drive</value>
+  </data>
+  <data name="Warning" xml:space="preserve">
+    <value>Warning</value>
+  </data>
+  <data name="ImportCancelledTheRemainingFilesWereNot" xml:space="preserve">
+    <value>, import cancelled — the remaining files were not touched</value>
+  </data>
+  <data name="LogErrors" xml:space="preserve">
+    <value>, errors {0}</value>
+  </data>
+  <data name="WithAProblem" xml:space="preserve">
+    <value> (with a problem: {0})</value>
+  </data>
+  <data name="SourceKeptFor" xml:space="preserve">
+    <value> (source kept for {0})</value>
+  </data>
+  <data name="LogImported" xml:space="preserve">
+    <value>imported</value>
+  </data>
+  <data name="LogResult" xml:space="preserve">
+    <value>Result:  </value>
+  </data>
+  <data name="LogFinished" xml:space="preserve">
+    <value>Finished:</value>
+  </data>
+  <data name="LogLineError" xml:space="preserve">
+    <value>[ERROR]    {0} — {1}</value>
+  </data>
+  <data name="LogLinePartial" xml:space="preserve">
+    <value>[PARTIAL]  {0} → {1}  ({2}{3}){4} — {5}</value>
+  </data>
+  <data name="LogLineKept" xml:space="preserve">
+    <value>[KEPT]     {0} → {1}  ({2}{3}){4} — source not deleted: {5}</value>
+  </data>
+  <data name="LogFiles" xml:space="preserve">
+    <value>Files:   </value>
+  </data>
+  <data name="LogNames" xml:space="preserve">
+    <value>Names:   </value>
+  </data>
+  <data name="LogTemplate" xml:space="preserve">
+    <value>Template:</value>
+  </data>
+  <data name="LogTarget" xml:space="preserve">
+    <value>Target:  </value>
+  </data>
+  <data name="LogSource" xml:space="preserve">
+    <value>Source:  </value>
+  </data>
+  <data name="LogModeCopy" xml:space="preserve">
+    <value>copy</value>
+  </data>
+  <data name="LogModeMove" xml:space="preserve">
+    <value>move</value>
+  </data>
+  <data name="LogMode" xml:space="preserve">
+    <value>Mode:    </value>
+  </data>
+  <data name="LogStarted" xml:space="preserve">
+    <value>Started: </value>
+  </data>
+  <data name="LogTitle" xml:space="preserve">
+    <value>import log</value>
+  </data>
+  <data name="AFolderPerImport" xml:space="preserve">
+    <value> (a folder per import)</value>
+  </data>
+  <data name="TheSameFoldersAndNamesAsIn" xml:space="preserve">
+    <value> (the same folders and names as in the library)</value>
+  </data>
+  <data name="LogSecondCopyLabel" xml:space="preserve">
+    <value>Second copy:</value>
+  </data>
+  <data name="FolderIsOutsideTheTargetFolder" xml:space="preserve">
+    <value>Folder “{0}” is outside the target folder</value>
+  </data>
+  <data name="FileIsOutsideTheSourceFolder" xml:space="preserve">
+    <value>File {0} is outside the source folder</value>
+  </data>
+  <data name="NoDateForFile" xml:space="preserve">
+    <value>No date for file {0}</value>
+  </data>
+  <data name="CouldNotFindAFreeNameFor" xml:space="preserve">
+    <value>Could not find a free name for “{0}”</value>
+  </data>
+  <data name="TheSourceReadsDifferentlyFromWhatWas" xml:space="preserve">
+    <value>The source reads differently from what was copied (unstable reading or the file changed). The file was not imported</value>
+  </data>
+  <data name="TheCopyOnTheDiskDoesNot" xml:space="preserve">
+    <value>The copy on the disk does not match the data that was read (write error). The file was not imported</value>
+  </data>
+  <data name="CouldNotClearTheReadOnlyAttribute" xml:space="preserve">
+    <value>Could not clear the read-only attribute of “{0}”: {1}</value>
+  </data>
+  <data name="SourceNotDeleted" xml:space="preserve">
+    <value>Copied to “{0}”, but the source was not deleted: {1}</value>
+  </data>
+  <data name="CopiedToButWritingToTheDisk" xml:space="preserve">
+    <value>Copied to “{0}”, but writing to the disk could not be completed; the source was not deleted: {1}</value>
+  </data>
+  <data name="CopiedToButTheSourceChangedWhile" xml:space="preserve">
+    <value>Copied to “{0}”, but the source changed while it was copied and was not deleted</value>
+  </data>
+  <data name="SourceNotDeletedNoReliableReread" xml:space="preserve">
+    <value>Copied to “{0}”, but the source was not deleted: its drive does not allow a reliable re-read for verification</value>
+  </data>
+  <data name="CopiedToTheSourceIsProtectedRead" xml:space="preserve">
+    <value>Copied to “{0}”; the source is protected (read-only attribute, e.g. protected in the camera) and was not deleted</value>
+  </data>
+  <data name="CopiedToButTheSourceChangedBetween" xml:space="preserve">
+    <value>Copied to “{0}”, but the source changed between the two copies; the source was not deleted</value>
+  </data>
+  <data name="SecondCopyFailed" xml:space="preserve">
+    <value>Copied to “{0}”, but the second copy was not made: {1}</value>
+  </data>
+  <data name="SecondCopyFailedSourceKept" xml:space="preserve">
+    <value>Copied to “{0}”, but the second copy was not made, so the source was not deleted: {1}</value>
+  </data>
+  <data name="TheSecondCopyIsIn" xml:space="preserve">
+    <value> (the second copy is in “{0}”)</value>
+  </data>
+  <data name="TheSecondCopyWouldBeInThe" xml:space="preserve">
+    <value>The second copy would be in the same folder as the source or the imported file</value>
+  </data>
+  <data name="InvalidFileName" xml:space="preserve">
+    <value>Invalid file name “{0}”</value>
+  </data>
+  <data name="TheFileIsAlreadyInTheDestination" xml:space="preserve">
+    <value>The file is already in the destination folder</value>
+  </data>
+  <data name="SourceFileNotFound" xml:space="preserve">
+    <value>Source file not found</value>
+  </data>
+  <data name="DriveDoesNotSupportReadingAroundThe" xml:space="preserve">
+    <value>Drive “{0}” does not support reading around the Windows cache: copies from and to it are verified less strictly. When moving, sources on it are not deleted.</value>
+  </data>
+  <data name="FileNotFound" xml:space="preserve">
+    <value>File not found</value>
+  </data>
+  <data name="UnknownTokenAvailable" xml:space="preserve">
+    <value>Unknown token {{{0}}}. Available: {1}</value>
+  </data>
+  <data name="WriteItAsLetterCaseMatters" xml:space="preserve">
+    <value>Write it as {{{0}}} (letter case matters)</value>
+  </data>
+  <data name="EmptyBraces" xml:space="preserve">
+    <value>Empty braces {}</value>
+  </data>
+  <data name="Missing" xml:space="preserve">
+    <value>Missing “}”</value>
+  </data>
+  <data name="ExtraWithout" xml:space="preserve">
+    <value>Extra “}” without “{”</value>
+  </data>
+  <data name="FileOne" xml:space="preserve">
+    <value>file</value>
+  </data>
+  <data name="FileFew" xml:space="preserve">
+    <value>files</value>
+  </data>
+  <data name="FileMany" xml:space="preserve">
+    <value>files</value>
+  </data>
+</root>

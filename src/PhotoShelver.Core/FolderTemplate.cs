@@ -23,14 +23,12 @@ public sealed class FolderTemplate
         "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
     };
 
-    private static string OnlyInNames(string token) => L.T(
-        $"{{{token}}} is for file names only; folders use the date: {TemplateSyntax.List(Tokens)}",
-        $"{{{token}}} — только для имён файлов; в папках — дата: {TemplateSyntax.List(Tokens)}");
+    private static string OnlyInNames(string token) => L.F(Strings.IsForFileNamesOnlyFoldersUse, token, TemplateSyntax.List(Tokens));
 
     private static readonly Dictionary<string, string> Elsewhere = new()
     {
         ["NAME"] = OnlyInNames("NAME"), ["HH"] = OnlyInNames("HH"), ["ss"] = OnlyInNames("ss"),
-        ["mm"] = L.T("{mm} is minutes (for file names only); the month is {MM}", "{mm} — это минуты (только для имён файлов); месяц — {MM}"),
+        ["mm"] = Strings.MmIsMinutesForFileNamesOnly,
     };
 
     private const int MaxLength = 200;
@@ -72,18 +70,18 @@ public sealed class FolderTemplate
         pattern = pattern?.Trim() ?? "";
         if (pattern.Length == 0)
         {
-            error = L.T("The template is empty", "Шаблон пустой");
+            error = Strings.TheTemplateIsEmpty;
             return false;
         }
         if (pattern.Length > MaxLength)
         {
-            error = L.T($"The template is too long (more than {MaxLength} characters)", $"Шаблон слишком длинный (больше {MaxLength} символов)");
+            error = L.F(Strings.TheTemplateIsTooLongMoreThan, MaxLength);
             return false;
         }
         var bad = pattern.IndexOfAny(InvalidChars);
         if (bad >= 0 || pattern.Any(char.IsControl))
         {
-            error = L.T("Invalid character: ", "Недопустимый символ: ") + (bad >= 0 ? pattern[bad].ToString() : L.T("control character", "управляющий символ"));
+            error = Strings.InvalidCharacter + (bad >= 0 ? pattern[bad].ToString() : Strings.ControlCharacter);
             return false;
         }
         if (!TemplateSyntax.TryTokenize(pattern, Tokens, Elsewhere, out var parts, out error))
@@ -92,9 +90,8 @@ public sealed class FolderTemplate
         if (!parts.Any(p => p.IsToken))
         {
             error = TemplateSyntax.BareToken(parts, Tokens) is { } bare
-                ? L.T($"Tokens are written in braces: {{{bare}}}", $"Токены пишутся в фигурных скобках: {{{bare}}}")
-                : L.T($"The template has no date. Add at least one token: {TemplateSyntax.List(Tokens)}",
-                    $"В шаблоне нет даты. Добавьте хотя бы один токен: {TemplateSyntax.List(Tokens)}");
+                ? L.F(Strings.TokensAreWrittenInBraces, bare)
+                : L.F(Strings.TheTemplateHasNoDateAddAt, TemplateSyntax.List(Tokens));
             return false;
         }
 
@@ -120,24 +117,24 @@ public sealed class FolderTemplate
         {
             if (segment.Count == 0)
             {
-                error = L.T("Empty folder level (extra slash)", "Пустой уровень папки (лишний слэш)");
+                error = Strings.EmptyFolderLevelExtraSlash;
                 return false;
             }
             // Spaces and dots come only from literal text, so a sample date shows them exactly.
             var name = Render(segment, new DateTime(2026, 1, 1));
             if (name.Trim().Length == 0 || name == "." || name == "..")
             {
-                error = L.T($"Invalid folder name: “{name}”", $"Недопустимое имя папки: «{name}»");
+                error = L.F(Strings.InvalidFolderName, name);
                 return false;
             }
             if (name.EndsWith('.') || name.EndsWith(' ') || name.StartsWith(' '))
             {
-                error = L.T("A folder name cannot start with a space or end with a space or a dot", "Имя папки не может начинаться с пробела или заканчиваться пробелом или точкой");
+                error = Strings.AFolderNameCannotStartWithA;
                 return false;
             }
             if (ReservedNames.Contains(name) || ReservedNames.Contains(Path.GetFileNameWithoutExtension(name)))
             {
-                error = L.T($"Reserved Windows name: “{name}”", $"Зарезервированное имя Windows: «{name}»");
+                error = L.F(Strings.ReservedWindowsName, name);
                 return false;
             }
         }
@@ -146,12 +143,11 @@ public sealed class FolderTemplate
         var hasYear = tokens.Contains("YYYY") || tokens.Contains("YY");
         var hasMonth = tokens.Contains("MM") || tokens.Contains("MMM");
         if (TemplateSyntax.BareToken(parts, Tokens) is { } bareToken)
-            candidate.Warning = L.T($"“{bareToken}” without braces is plain text; the token is written {{{bareToken}}}",
-                $"«{bareToken}» без скобок — это просто текст; токен пишется {{{bareToken}}}");
+            candidate.Warning = L.F(Strings.WithoutBracesIsPlainTextTheToken, bareToken);
         else if (tokens.Contains("DD") && !hasMonth)
-            candidate.Warning = L.T("No month ({MM} or {MMM}): files from the same day of different months share a folder", "Нет месяца ({MM} или {MMM}): в одну папку попадут файлы одного числа разных месяцев");
+            candidate.Warning = Strings.NoMonthMMOrMMMFilesFrom;
         else if (hasMonth && !hasYear)
-            candidate.Warning = L.T("No year ({YYYY} or {YY}): files from the same month of different years share a folder", "Нет года ({YYYY} или {YY}): в одну папку попадут файлы одного месяца разных лет");
+            candidate.Warning = Strings.NoYearYYYYOrYYFilesFrom;
 
         template = candidate;
         return true;

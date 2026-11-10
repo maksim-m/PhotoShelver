@@ -17,21 +17,21 @@ public partial class ImportSummaryWindow : Window
         _targetFolder = info.TargetFolder;
         _logPath = info.LogPath;
 
-        HeadlineText.Text = result.Cancelled ? L.T("Import cancelled", "Импорт отменён")
-            : result.Failures.Count > 0 ? L.T("Import finished with errors", "Импорт завершён с ошибками")
-            : result.Warnings.Count > 0 || info.LogError is not null ? L.T("Import finished with warnings", "Импорт завершён с предупреждениями")
+        HeadlineText.Text = result.Cancelled ? Strings.ImportCancelled
+            : result.Failures.Count > 0 ? Strings.ImportFinishedWithErrors
+            : result.Warnings.Count > 0 || info.LogError is not null ? Strings.ImportFinishedWithWarnings
             : Ui.ImportFinished;
         Title = HeadlineText.Text;
 
-        var details = L.T($"Imported: {Format.Files(result.Imported.Count)}.", $"Импортировано: {Format.Files(result.Imported.Count)}.");
+        var details = L.F(Strings.DialogImported, Format.Files(result.Imported.Count));
         var backups = result.Imported.Count(i => i.BackupPath is not null);
-        if (backups > 0) details += L.T($" Second copies: {backups}.", $" Вторых копий: {backups}.");
-        if (result.Failures.Count > 0) details += L.T($" Errors: {result.Failures.Count}.", $" Ошибок: {result.Failures.Count}.");
-        if (result.Cancelled) details += L.T(" The remaining files were not touched.", " Оставшиеся файлы не тронуты.");
+        if (backups > 0) details += L.F(Strings.SecondCopies, backups);
+        if (result.Failures.Count > 0) details += L.F(Strings.DialogErrors, result.Failures.Count);
+        if (result.Cancelled) details += Strings.TheRemainingFilesWereNotTouched;
         DetailsText.Text = details;
 
         var warnings = result.Warnings.ToList();
-        if (info.LogError is not null) warnings.Add(L.T($"The import log could not be written completely: {info.LogError}", $"Журнал импорта не удалось записать полностью: {info.LogError}"));
+        if (info.LogError is not null) warnings.Add(L.F(Strings.TheImportLogCouldNotBeWritten, info.LogError));
         if (warnings.Count > 0)
         {
             WarningsText.Text = string.Join("\n\n", warnings);

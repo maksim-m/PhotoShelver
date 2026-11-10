@@ -26,7 +26,7 @@ public static class ImportPlan
     public static string DestinationFolder(string targetRoot, FolderTemplate template, SourceFile file)
     {
         if (file.Date is not { } date)
-            throw new InvalidOperationException(L.T($"No date for file {file.Path}", $"Нет даты для файла {file.Path}"));
+            throw new InvalidOperationException(L.F(Strings.NoDateForFile, file.Path));
         return Inside(targetRoot, template.Format(date.Local));
     }
 
@@ -35,7 +35,7 @@ public static class ImportPlan
     {
         if (names is null || names.KeepsOriginalNames) return file.FileName;
         if (file.Date is not { } date)
-            throw new InvalidOperationException(L.T($"No date for file {file.Path}", $"Нет даты для файла {file.Path}"));
+            throw new InvalidOperationException(L.F(Strings.NoDateForFile, file.Path));
         return names.Format(date.Local, file.FileName);
     }
 
@@ -63,7 +63,7 @@ public static class ImportPlan
         session = Inside(backup.Root, Path.GetRelativePath(PathUtil.WithTrailingSeparator(backup.Root), Path.GetFullPath(session)));
         var relative = Path.GetRelativePath(PathUtil.WithTrailingSeparator(backup.SourceRoot), Path.GetDirectoryName(file.Path)!);
         if (Path.IsPathRooted(relative) || relative == ".." || relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal))
-            throw new InvalidOperationException(L.T($"File {file.Path} is outside the source folder", $"Файл {file.Path} вне папки-источника"));
+            throw new InvalidOperationException(L.F(Strings.FileIsOutsideTheSourceFolder, file.Path));
         return relative == "." ? session : Inside(session, relative);
     }
 
@@ -90,7 +90,7 @@ public static class ImportPlan
         var prefix = PathUtil.WithTrailingSeparator(root); // "E:\" and "E:\Photos\" alike
         var folder = Path.GetFullPath(Path.Combine(prefix, relative));
         if (!folder.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) || folder.Length <= prefix.Length)
-            throw new InvalidOperationException(L.T($"Folder “{folder}” is outside the target folder", $"Папка «{folder}» вне папки-цели"));
+            throw new InvalidOperationException(L.F(Strings.FolderIsOutsideTheTargetFolder, folder));
         return folder;
     }
 }

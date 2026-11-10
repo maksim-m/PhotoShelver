@@ -1,0 +1,611 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <data name="AnUnexpectedInterfaceErrorOccurredTheApp" xml:space="preserve">
+    <value>Произошла непредвиденная ошибка интерфейса. Приложение продолжит работу.
+
+{0}
+
+Подробности: {1}</value>
+  </data>
+  <data name="LongDateTimeFormat" xml:space="preserve">
+    <value>d MMMM yyyy, HH:mm:ss</value>
+  </data>
+  <data name="LongDateFormat" xml:space="preserve">
+    <value>d MMMM yyyy</value>
+  </data>
+  <data name="DurationHoursMinutes" xml:space="preserve">
+    <value>~{0} ч {1} мин</value>
+  </data>
+  <data name="DurationMinutes" xml:space="preserve">
+    <value>~{0} мин</value>
+  </data>
+  <data name="T1Min" xml:space="preserve">
+    <value>&lt; 1 мин</value>
+  </data>
+  <data name="B" xml:space="preserve">
+    <value> Б</value>
+  </data>
+  <data name="KB" xml:space="preserve">
+    <value> КБ</value>
+  </data>
+  <data name="MB" xml:space="preserve">
+    <value> МБ</value>
+  </data>
+  <data name="GB" xml:space="preserve">
+    <value> ГБ</value>
+  </data>
+  <data name="TheImportLogCouldNotBeWritten" xml:space="preserve">
+    <value>Журнал импорта не удалось записать полностью: {0}</value>
+  </data>
+  <data name="TheRemainingFilesWereNotTouched" xml:space="preserve">
+    <value> Оставшиеся файлы не тронуты.</value>
+  </data>
+  <data name="DialogErrors" xml:space="preserve">
+    <value> Ошибок: {0}.</value>
+  </data>
+  <data name="SecondCopies" xml:space="preserve">
+    <value> Вторых копий: {0}.</value>
+  </data>
+  <data name="DialogImported" xml:space="preserve">
+    <value>Импортировано: {0}.</value>
+  </data>
+  <data name="ImportFinishedWithWarnings" xml:space="preserve">
+    <value>Импорт завершён с предупреждениями</value>
+  </data>
+  <data name="ImportFinishedWithErrors" xml:space="preserve">
+    <value>Импорт завершён с ошибками</value>
+  </data>
+  <data name="ImportCancelled" xml:space="preserve">
+    <value>Импорт отменён</value>
+  </data>
+  <data name="ImportInProgressWaitUntilItFinishes" xml:space="preserve">
+    <value>Идёт импорт. Дождитесь окончания или нажмите «Отмена».</value>
+  </data>
+  <data name="Close" xml:space="preserve">
+    <value>Закрыть</value>
+  </data>
+  <data name="OpenTargetFolder" xml:space="preserve">
+    <value>Открыть папку цели</value>
+  </data>
+  <data name="OpenLog" xml:space="preserve">
+    <value>Открыть журнал</value>
+  </data>
+  <data name="ImportFinished" xml:space="preserve">
+    <value>Импорт завершён</value>
+  </data>
+  <data name="Cancel" xml:space="preserve">
+    <value>Отмена</value>
+  </data>
+  <data name="Import" xml:space="preserve">
+    <value>Импорт</value>
+  </data>
+  <data name="Copy" xml:space="preserve">
+    <value>Копировать</value>
+  </data>
+  <data name="Move" xml:space="preserve">
+    <value>Переместить</value>
+  </data>
+  <data name="CopyInsteadOfMoving" xml:space="preserve">
+    <value>Копировать вместо перемещения</value>
+  </data>
+  <data name="Delete" xml:space="preserve">
+    <value>Удалить</value>
+  </data>
+  <data name="Show" xml:space="preserve">
+    <value>Показать</value>
+  </data>
+  <data name="ShowTheWholeTree" xml:space="preserve">
+    <value>Показать всё дерево</value>
+  </data>
+  <data name="EveryImportedFileIsAlsoCopiedHere" xml:space="preserve">
+    <value>Каждый импортируемый файл копируется ещё и сюда и проверяется. При перемещении исходник удаляется только после проверки обеих копий</value>
+  </data>
+  <data name="ACopyOfTheLibraryTheSame" xml:space="preserve">
+    <value>Копия библиотеки: те же папки по датам и имена файлов</value>
+  </data>
+  <data name="ANewFolderForEachImportFiles" xml:space="preserve">
+    <value>Новая папка на каждый импорт, файлы как на карте (те же подпапки и имена)</value>
+  </data>
+  <data name="SecondCopy" xml:space="preserve">
+    <value>Вторая копия</value>
+  </data>
+  <data name="NAMEOriginalNameYYYYMMDDHH" xml:space="preserve">
+    <value>{NAME} — исходное имя · {YYYY} · {MM} · {DD} · {HH} · {mm} · {ss}</value>
+  </data>
+  <data name="TokensInBracesNAMETheOriginalName" xml:space="preserve">
+    <value>Токены в фигурных скобках: {NAME} — исходное имя (один {NAME} — имена как есть), {YYYY}, {YY}, {MM}, {MMM}, {DD} — дата, {HH}, {mm}, {ss} — время съёмки. Текст вне скобок остаётся как есть; расширение всегда сохраняется</value>
+  </data>
+  <data name="FileNames" xml:space="preserve">
+    <value>Имена файлов</value>
+  </data>
+  <data name="Advanced" xml:space="preserve">
+    <value>Дополнительно</value>
+  </data>
+  <data name="YYYYYYMMMMMDDNewLevel" xml:space="preserve">
+    <value>{YYYY} · {YY} · {MM} · {MMM} · {DD} · / — новый уровень</value>
+  </data>
+  <data name="PickAPresetOrTypeYourOwn" xml:space="preserve">
+    <value>Выберите вариант или введите свой. Токены в фигурных скобках: {YYYY} — год, {YY} — год (2 цифры), {MM} — месяц, {MMM} — месяц (Jan…Dec), {DD} — день; / — вложенная папка. Текст вне скобок остаётся как есть</value>
+  </data>
+  <data name="FolderTemplate" xml:space="preserve">
+    <value>Шаблон папок</value>
+  </data>
+  <data name="Target" xml:space="preserve">
+    <value>Цель</value>
+  </data>
+  <data name="CollapseOrExpand" xml:space="preserve">
+    <value>Свернуть или развернуть</value>
+  </data>
+  <data name="DaySelection" xml:space="preserve">
+    <value>Выбор дня</value>
+  </data>
+  <data name="ImportThisFile" xml:space="preserve">
+    <value>Импортировать этот файл</value>
+  </data>
+  <data name="ShowInFolder" xml:space="preserve">
+    <value>Показать в папке</value>
+  </data>
+  <data name="Open" xml:space="preserve">
+    <value>Открыть</value>
+  </data>
+  <data name="ClearSelection" xml:space="preserve">
+    <value>Снять все</value>
+  </data>
+  <data name="SelectAllNew" xml:space="preserve">
+    <value>Выбрать все новые</value>
+  </data>
+  <data name="IncludeSubfolders" xml:space="preserve">
+    <value>Включая подпапки</value>
+  </data>
+  <data name="ExpandAllDays" xml:space="preserve">
+    <value>Развернуть все дни</value>
+  </data>
+  <data name="ExpandAll" xml:space="preserve">
+    <value>Развернуть все</value>
+  </data>
+  <data name="CollapseAllDays" xml:space="preserve">
+    <value>Свернуть все дни</value>
+  </data>
+  <data name="CollapseAll" xml:space="preserve">
+    <value>Свернуть все</value>
+  </data>
+  <data name="Browse" xml:space="preserve">
+    <value>Выбрать…</value>
+  </data>
+  <data name="Source" xml:space="preserve">
+    <value>Источник</value>
+  </data>
+  <data name="NoNewFilesOnThisDay" xml:space="preserve">
+    <value>В этом дне нет новых файлов</value>
+  </data>
+  <data name="SelectAllNewFilesOfThisDay" xml:space="preserve">
+    <value>Выбрать все новые файлы этого дня / снять выбор</value>
+  </data>
+  <data name="Selected" xml:space="preserve">
+    <value>выбрано</value>
+  </data>
+  <data name="TheSourceAndTheTargetMustNot" xml:space="preserve">
+    <value>Источник и цель не должны совпадать или находиться одна внутри другой</value>
+  </data>
+  <data name="TheTargetFolderIsOnAWrite" xml:space="preserve">
+    <value>Папка-цель на носителе, защищённом от записи</value>
+  </data>
+  <data name="TargetFolderNotFound" xml:space="preserve">
+    <value>Папка-цель не найдена</value>
+  </data>
+  <data name="SourceFolderNotFound" xml:space="preserve">
+    <value>Папка-источник не найдена</value>
+  </data>
+  <data name="NoFilesToImport" xml:space="preserve">
+    <value>Нет файлов для импорта</value>
+  </data>
+  <data name="NoPhotosOrVideosInTheSource" xml:space="preserve">
+    <value>В источнике нет фото и видео</value>
+  </data>
+  <data name="ChooseASourceToSeeWhereThe" xml:space="preserve">
+    <value>Выберите источник, чтобы увидеть, куда попадут файлы</value>
+  </data>
+  <data name="ReadingTheSourceFiles" xml:space="preserve">
+    <value>Читаю файлы источника…</value>
+  </data>
+  <data name="BuildingTheFolderTree" xml:space="preserve">
+    <value>Строю дерево папок…</value>
+  </data>
+  <data name="ChooseTheFolderToImportTo" xml:space="preserve">
+    <value>Выберите папку, куда импортировать</value>
+  </data>
+  <data name="SkippedOfOtherTypes" xml:space="preserve">
+    <value>Пропущено {0} других типов</value>
+  </data>
+  <data name="SummarySelected" xml:space="preserve">
+    <value>Выбрано {0}</value>
+  </data>
+  <data name="SummaryErrors" xml:space="preserve">
+    <value>Ошибок {0}</value>
+  </data>
+  <data name="DuplicatesInSource" xml:space="preserve">
+    <value>Дубликатов в источнике {0}</value>
+  </data>
+  <data name="AlreadyInTarget" xml:space="preserve">
+    <value>Уже в цели {0}</value>
+  </data>
+  <data name="New" xml:space="preserve">
+    <value>Новых {0}</value>
+  </data>
+  <data name="Total" xml:space="preserve">
+    <value>Всего {0}</value>
+  </data>
+  <data name="CouldNotBeRead" xml:space="preserve">
+    <value>Не удалось прочитать</value>
+  </data>
+  <data name="CouldNotCheckForDuplicatesImportIs" xml:space="preserve">
+    <value>Не удалось проверить дубликаты, импорт недоступен: {0}</value>
+  </data>
+  <data name="CheckingForDuplicates" xml:space="preserve">
+    <value>Проверка дубликатов…</value>
+  </data>
+  <data name="CouldNotReadTheSourceFolder" xml:space="preserve">
+    <value>Не удалось прочитать папку-источник: {0}</value>
+  </data>
+  <data name="NoPhotosOrVideosInThisFolder" xml:space="preserve">
+    <value>В этой папке нет фото и видео</value>
+  </data>
+  <data name="ReadingMetadataOf" xml:space="preserve">
+    <value>Чтение метаданных: {0} из {1}</value>
+  </data>
+  <data name="LookingForFiles" xml:space="preserve">
+    <value>Поиск файлов…</value>
+  </data>
+  <data name="FolderNotFound" xml:space="preserve">
+    <value>Папка не найдена</value>
+  </data>
+  <data name="TheImportStoppedBecauseOfAnUnexpected" xml:space="preserve">
+    <value>Импорт прерван из-за непредвиденной ошибки: {0}</value>
+  </data>
+  <data name="Left" xml:space="preserve">
+    <value> · осталось {0}</value>
+  </data>
+  <data name="ImportingOfOf" xml:space="preserve">
+    <value>Импорт: {0} из {1} · {2} из {3}</value>
+  </data>
+  <data name="Importing0Of" xml:space="preserve">
+    <value>Импорт: 0 из {0}</value>
+  </data>
+  <data name="NotEnoughSpaceForTheSecondCopy" xml:space="preserve">
+    <value>Недостаточно места для второй копии: нужно {0}, свободно {1}.</value>
+  </data>
+  <data name="NotEnoughSpaceOnTheTargetDrive" xml:space="preserve">
+    <value>Недостаточно места на диске цели: нужно {0}, свободно {1}.</value>
+  </data>
+  <data name="TheSourceDriveIsWriteProtectedE" xml:space="preserve">
+    <value>Носитель-источник защищён от записи (например, переключатель на карте памяти) — файлы нельзя переместить.</value>
+  </data>
+  <data name="CouldNotPrepareTheImport" xml:space="preserve">
+    <value>Не удалось подготовить импорт: {0}</value>
+  </data>
+  <data name="TheSecondCopyIsOnButIts" xml:space="preserve">
+    <value>вторая копия включена, но папка не задана</value>
+  </data>
+  <data name="CancellingTheCurrentFileWillBeFinished" xml:space="preserve">
+    <value>Отмена… текущий файл будет завершён</value>
+  </data>
+  <data name="TargetFolderImportTo" xml:space="preserve">
+    <value>Папка-цель (куда импортировать)</value>
+  </data>
+  <data name="SourceFolderImportFrom" xml:space="preserve">
+    <value>Папка-источник (откуда импортировать)</value>
+  </data>
+  <data name="ChooseAFolderWithPhotosAndVideos" xml:space="preserve">
+    <value>Выберите папку с фото и видео</value>
+  </data>
+  <data name="CouldNotDelete" xml:space="preserve">
+    <value>Не удалось удалить {0}: {1}</value>
+  </data>
+  <data name="OnlyFilesNamedLikeNameXxxxxxxxImporting" xml:space="preserve">
+    <value>Удаляются только файлы с именем вида «имя.xxxxxxxx.importing». Фото и видео не затрагиваются.</value>
+  </data>
+  <data name="DeleteImportingLeftOverFromAnInterrupted" xml:space="preserve">
+    <value>Удалить {0} *.importing, оставшихся от прерванного импорта?</value>
+  </data>
+  <data name="CouldNotOpen" xml:space="preserve">
+    <value>Не удалось открыть «{0}»: {1}</value>
+  </data>
+  <data name="FileNotFoundPerhapsAlreadyMoved" xml:space="preserve">
+    <value>Файл не найден (возможно, уже перемещён): {0}</value>
+  </data>
+  <data name="TheTargetFolderOrTheSecondCopy" xml:space="preserve">
+    <value>В папке-цели (или второй копии) {0} от прерванного импорта (*.importing). Это лишние незавершённые копии: исходники для них не удалялись.</value>
+  </data>
+  <data name="FolderNotChosen" xml:space="preserve">
+    <value>папка не выбрана</value>
+  </data>
+  <data name="AdvancedSecondCopy" xml:space="preserve">
+    <value>вторая копия — </value>
+  </data>
+  <data name="AdvancedNames" xml:space="preserve">
+    <value>имена — </value>
+  </data>
+  <data name="ErrorInTheFileNameTemplate" xml:space="preserve">
+    <value>ошибка в шаблоне имён</value>
+  </data>
+  <data name="BackupOnSourceDrive" xml:space="preserve">
+    <value>Вторая копия на том же носителе, что и источник</value>
+  </data>
+  <data name="BackupOnLibraryDrive" xml:space="preserve">
+    <value>Вторая копия на том же диске, что и библиотека: при отказе диска пропадут обе</value>
+  </data>
+  <data name="Example" xml:space="preserve">
+    <value>Пример: </value>
+  </data>
+  <data name="BackupInsideTarget" xml:space="preserve">
+    <value>Вторая копия не должна быть в папке-цели (или содержать её)</value>
+  </data>
+  <data name="BackupInsideSource" xml:space="preserve">
+    <value>Вторая копия не должна быть в папке-источнике (или содержать её)</value>
+  </data>
+  <data name="BackupFolderWriteProtected" xml:space="preserve">
+    <value>Папка для второй копии на носителе, защищённом от записи</value>
+  </data>
+  <data name="BackupFolderNotFound" xml:space="preserve">
+    <value>Папка для второй копии не найдена</value>
+  </data>
+  <data name="ChooseAFolderForTheSecondCopy" xml:space="preserve">
+    <value>Выберите папку для второй копии (Дополнительно)</value>
+  </data>
+  <data name="FolderForTheSecondCopy" xml:space="preserve">
+    <value>Папка для второй копии</value>
+  </data>
+  <data name="DuplicateOfASourceFile" xml:space="preserve">
+    <value>Дубликат файла в источнике: </value>
+  </data>
+  <data name="AlreadyImported" xml:space="preserve">
+    <value>Уже импортирован: </value>
+  </data>
+  <data name="TheCaptureTimeZoneIsUnknownThis" xml:space="preserve">
+    <value>Часовой пояс съёмки неизвестен — использован пояс этого компьютера</value>
+  </data>
+  <data name="NoCaptureDateInTheMetadataThe" xml:space="preserve">
+    <value>В метаданных нет даты съёмки — использована дата изменения файла</value>
+  </data>
+  <data name="ReadError" xml:space="preserve">
+    <value>Ошибка чтения: {0}</value>
+  </data>
+  <data name="WithoutNAMEShotsTakenInTheSame" xml:space="preserve">
+    <value>Без {NAME} у снимков одной секунды (или одного дня, если нет времени) имена совпадут: добавятся _1, _2…, и пары RAW+JPEG или Live Photo могут получить разные номера</value>
+  </data>
+  <data name="MMAfterTheHoursIsTheMonth" xml:space="preserve">
+    <value>{MM} после часов — это месяц; минуты — {mm}</value>
+  </data>
+  <data name="MmIsMinutesWithoutHoursTheMonth" xml:space="preserve">
+    <value>{mm} — это минуты (а часов нет); месяц — {MM}</value>
+  </data>
+  <data name="WithoutBracesIsPlainTextTheToken" xml:space="preserve">
+    <value>«{0}» без скобок — это просто текст; токен пишется {{{0}}}</value>
+  </data>
+  <data name="ReservedWindowsName" xml:space="preserve">
+    <value>Зарезервированное имя Windows: «{0}»</value>
+  </data>
+  <data name="TheTemplateHasNoTokensSoEvery" xml:space="preserve">
+    <value>В шаблоне нет ни одного токена — все файлы получили бы одно имя. Добавьте {{NAME}} или дату: {0}</value>
+  </data>
+  <data name="TokensAreWrittenInBraces" xml:space="preserve">
+    <value>Токены пишутся в фигурных скобках: {{{0}}}</value>
+  </data>
+  <data name="AFileNameCannotEndWithA" xml:space="preserve">
+    <value>Имя файла не может заканчиваться точкой</value>
+  </data>
+  <data name="ControlCharacter" xml:space="preserve">
+    <value>управляющий символ</value>
+  </data>
+  <data name="InvalidCharacter" xml:space="preserve">
+    <value>Недопустимый символ: </value>
+  </data>
+  <data name="AFileNameCannotContainOrFolders" xml:space="preserve">
+    <value>В имени файла не может быть / и \ — папки задаются шаблоном папок</value>
+  </data>
+  <data name="TheTemplateIsTooLongMoreThan" xml:space="preserve">
+    <value>Шаблон слишком длинный (больше {0} символов)</value>
+  </data>
+  <data name="TheTemplateIsEmpty" xml:space="preserve">
+    <value>Шаблон пустой</value>
+  </data>
+  <data name="NoYearYYYYOrYYFilesFrom" xml:space="preserve">
+    <value>Нет года ({YYYY} или {YY}): в одну папку попадут файлы одного месяца разных лет</value>
+  </data>
+  <data name="NoMonthMMOrMMMFilesFrom" xml:space="preserve">
+    <value>Нет месяца ({MM} или {MMM}): в одну папку попадут файлы одного числа разных месяцев</value>
+  </data>
+  <data name="AFolderNameCannotStartWithA" xml:space="preserve">
+    <value>Имя папки не может начинаться с пробела или заканчиваться пробелом или точкой</value>
+  </data>
+  <data name="InvalidFolderName" xml:space="preserve">
+    <value>Недопустимое имя папки: «{0}»</value>
+  </data>
+  <data name="EmptyFolderLevelExtraSlash" xml:space="preserve">
+    <value>Пустой уровень папки (лишний слэш)</value>
+  </data>
+  <data name="TheTemplateHasNoDateAddAt" xml:space="preserve">
+    <value>В шаблоне нет даты. Добавьте хотя бы один токен: {0}</value>
+  </data>
+  <data name="MmIsMinutesForFileNamesOnly" xml:space="preserve">
+    <value>{mm} — это минуты (только для имён файлов); месяц — {MM}</value>
+  </data>
+  <data name="IsForFileNamesOnlyFoldersUse" xml:space="preserve">
+    <value>{{{0}}} — только для имён файлов; в папках — дата: {1}</value>
+  </data>
+  <data name="NotAnImportTempFileNotDeleted" xml:space="preserve">
+    <value>Не временный файл импорта — не удаляется</value>
+  </data>
+  <data name="LogSecondCopy" xml:space="preserve">
+    <value> + вторая копия {0}</value>
+  </data>
+  <data name="MovedByRenamingOnTheSameDrive" xml:space="preserve">
+    <value>, перемещён переименованием на том же диске</value>
+  </data>
+  <data name="Warning" xml:space="preserve">
+    <value>Предупреждение</value>
+  </data>
+  <data name="ImportCancelledTheRemainingFilesWereNot" xml:space="preserve">
+    <value>, импорт отменён — оставшиеся файлы не тронуты</value>
+  </data>
+  <data name="LogErrors" xml:space="preserve">
+    <value>, ошибок {0}</value>
+  </data>
+  <data name="WithAProblem" xml:space="preserve">
+    <value> (из них с замечанием: {0})</value>
+  </data>
+  <data name="SourceKeptFor" xml:space="preserve">
+    <value> (из них исходник оставлен: {0})</value>
+  </data>
+  <data name="LogImported" xml:space="preserve">
+    <value>импортировано</value>
+  </data>
+  <data name="LogResult" xml:space="preserve">
+    <value>Итог:    </value>
+  </data>
+  <data name="LogFinished" xml:space="preserve">
+    <value>Конец:   </value>
+  </data>
+  <data name="LogLineError" xml:space="preserve">
+    <value>[ОШИБКА]   {0} — {1}</value>
+  </data>
+  <data name="LogLinePartial" xml:space="preserve">
+    <value>[ЧАСТИЧНО] {0} → {1}  ({2}{3}){4} — {5}</value>
+  </data>
+  <data name="LogLineKept" xml:space="preserve">
+    <value>[ОСТАВЛЕН] {0} → {1}  ({2}{3}){4} — исходник не удалён: {5}</value>
+  </data>
+  <data name="LogFiles" xml:space="preserve">
+    <value>Файлов:  </value>
+  </data>
+  <data name="LogNames" xml:space="preserve">
+    <value>Имена:   </value>
+  </data>
+  <data name="LogTemplate" xml:space="preserve">
+    <value>Шаблон:  </value>
+  </data>
+  <data name="LogTarget" xml:space="preserve">
+    <value>Цель:    </value>
+  </data>
+  <data name="LogSource" xml:space="preserve">
+    <value>Источник:</value>
+  </data>
+  <data name="LogModeCopy" xml:space="preserve">
+    <value>копирование</value>
+  </data>
+  <data name="LogModeMove" xml:space="preserve">
+    <value>перемещение</value>
+  </data>
+  <data name="LogMode" xml:space="preserve">
+    <value>Режим:   </value>
+  </data>
+  <data name="LogStarted" xml:space="preserve">
+    <value>Начало:  </value>
+  </data>
+  <data name="LogTitle" xml:space="preserve">
+    <value>журнал импорта</value>
+  </data>
+  <data name="AFolderPerImport" xml:space="preserve">
+    <value> (папка на каждый импорт)</value>
+  </data>
+  <data name="TheSameFoldersAndNamesAsIn" xml:space="preserve">
+    <value> (те же папки и имена, что в библиотеке)</value>
+  </data>
+  <data name="LogSecondCopyLabel" xml:space="preserve">
+    <value>Вторая копия:</value>
+  </data>
+  <data name="FolderIsOutsideTheTargetFolder" xml:space="preserve">
+    <value>Папка «{0}» вне папки-цели</value>
+  </data>
+  <data name="FileIsOutsideTheSourceFolder" xml:space="preserve">
+    <value>Файл {0} вне папки-источника</value>
+  </data>
+  <data name="NoDateForFile" xml:space="preserve">
+    <value>Нет даты для файла {0}</value>
+  </data>
+  <data name="CouldNotFindAFreeNameFor" xml:space="preserve">
+    <value>Не удалось подобрать свободное имя для «{0}»</value>
+  </data>
+  <data name="TheSourceReadsDifferentlyFromWhatWas" xml:space="preserve">
+    <value>Исходный файл при повторном чтении отличается от скопированного (нестабильное чтение или файл изменился). Файл не импортирован</value>
+  </data>
+  <data name="TheCopyOnTheDiskDoesNot" xml:space="preserve">
+    <value>Копия на диске не совпадает с прочитанными данными (ошибка записи). Файл не импортирован</value>
+  </data>
+  <data name="CouldNotClearTheReadOnlyAttribute" xml:space="preserve">
+    <value>Не удалось снять атрибут «только чтение» с «{0}»: {1}</value>
+  </data>
+  <data name="SourceNotDeleted" xml:space="preserve">
+    <value>Скопирован в «{0}», но исходный файл не удалён: {1}</value>
+  </data>
+  <data name="CopiedToButWritingToTheDisk" xml:space="preserve">
+    <value>Скопирован в «{0}», но не удалось завершить запись на диск, исходный файл не удалён: {1}</value>
+  </data>
+  <data name="CopiedToButTheSourceChangedWhile" xml:space="preserve">
+    <value>Скопирован в «{0}», но исходный файл изменился во время копирования и не удалён</value>
+  </data>
+  <data name="SourceNotDeletedNoReliableReread" xml:space="preserve">
+    <value>Скопирован в «{0}», но исходный файл не удалён: носитель не позволяет надёжно перечитать его для проверки</value>
+  </data>
+  <data name="CopiedToTheSourceIsProtectedRead" xml:space="preserve">
+    <value>Скопирован в «{0}»; исходный файл защищён (атрибут «только чтение», например защита в камере) и не удалён</value>
+  </data>
+  <data name="CopiedToButTheSourceChangedBetween" xml:space="preserve">
+    <value>Скопирован в «{0}», но исходный файл изменился между двумя копиями; исходный файл не удалён</value>
+  </data>
+  <data name="SecondCopyFailed" xml:space="preserve">
+    <value>Скопирован в «{0}», но вторая копия не создана: {1}</value>
+  </data>
+  <data name="SecondCopyFailedSourceKept" xml:space="preserve">
+    <value>Скопирован в «{0}», но вторая копия не создана, поэтому исходный файл не удалён: {1}</value>
+  </data>
+  <data name="TheSecondCopyIsIn" xml:space="preserve">
+    <value> (вторая копия — «{0}»)</value>
+  </data>
+  <data name="TheSecondCopyWouldBeInThe" xml:space="preserve">
+    <value>Вторая копия оказалась бы в одной папке с исходным или импортированным файлом</value>
+  </data>
+  <data name="InvalidFileName" xml:space="preserve">
+    <value>Недопустимое имя файла «{0}»</value>
+  </data>
+  <data name="TheFileIsAlreadyInTheDestination" xml:space="preserve">
+    <value>Файл уже находится в папке назначения</value>
+  </data>
+  <data name="SourceFileNotFound" xml:space="preserve">
+    <value>Исходный файл не найден</value>
+  </data>
+  <data name="DriveDoesNotSupportReadingAroundThe" xml:space="preserve">
+    <value>Носитель «{0}» не поддерживает чтение в обход кэша Windows: проверка копий с него и на него слабее обычной. При перемещении исходники с такого носителя не удаляются.</value>
+  </data>
+  <data name="FileNotFound" xml:space="preserve">
+    <value>Файл не найден</value>
+  </data>
+  <data name="UnknownTokenAvailable" xml:space="preserve">
+    <value>Непонятный токен {{{0}}}. Доступны: {1}</value>
+  </data>
+  <data name="WriteItAsLetterCaseMatters" xml:space="preserve">
+    <value>Пишется так: {{{0}}} (регистр букв важен)</value>
+  </data>
+  <data name="EmptyBraces" xml:space="preserve">
+    <value>Пустые скобки {}</value>
+  </data>
+  <data name="Missing" xml:space="preserve">
+    <value>Не хватает «}»</value>
+  </data>
+  <data name="ExtraWithout" xml:space="preserve">
+    <value>Лишняя «}» без «{»</value>
+  </data>
+  <data name="FileOne" xml:space="preserve">
+    <value>файл</value>
+  </data>
+  <data name="FileFew" xml:space="preserve">
+    <value>файла</value>
+  </data>
+  <data name="FileMany" xml:space="preserve">
+    <value>файлов</value>
+  </data>
+</root>

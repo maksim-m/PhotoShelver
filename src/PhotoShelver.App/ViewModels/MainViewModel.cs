@@ -122,7 +122,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             _template = template;
             TemplateError = null;
             TemplateWarning = template!.Warning;
-            TemplateExample = L.T("Example: ", "Пример: ") + template.Format(DateTime.Now);
+            TemplateExample = Strings.Example + template.Format(DateTime.Now);
         }
         else
         {
@@ -153,7 +153,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             _nameTemplate = names;
             NameTemplateError = null;
             NameTemplateWarning = names!.Warning;
-            NameTemplateExample = L.T("Example: ", "Пример: ") + names.Format(DateTime.Now, ExampleFileName);
+            NameTemplateExample = Strings.Example + names.Format(DateTime.Now, ExampleFileName);
         }
         else
         {
@@ -194,7 +194,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand(CanExecute = nameof(IsIdle))]
     private void BrowseBackup()
     {
-        var path = PickFolder(L.T("Folder for the second copy", "Папка для второй копии"), BackupPath);
+        var path = PickFolder(Strings.FolderForTheSecondCopy, BackupPath);
         if (path is not null) BackupPath = path;
     }
 
@@ -203,15 +203,15 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     {
         if (!IsBackupEnabled) return null;
         if (string.IsNullOrWhiteSpace(BackupPath))
-            return L.T("Choose a folder for the second copy (Advanced)", "Выберите папку для второй копии (Дополнительно)");
+            return Strings.ChooseAFolderForTheSecondCopy;
         if (!Directory.Exists(BackupPath))
-            return L.T("The folder for the second copy is not found", "Папка для второй копии не найдена");
+            return Strings.BackupFolderNotFound;
         if (PathUtil.IsReadOnlyVolume(BackupPath))
-            return L.T("The folder for the second copy is on a write-protected drive", "Папка для второй копии на носителе, защищённом от записи");
+            return Strings.BackupFolderWriteProtected;
         if (!string.IsNullOrWhiteSpace(SourcePath) && PathUtil.AreNestedOrEqual(BackupPath, SourcePath))
-            return L.T("The second copy must not be in the source folder (or contain it)", "Вторая копия не должна быть в папке-источнике (или содержать её)");
+            return Strings.BackupInsideSource;
         if (!string.IsNullOrWhiteSpace(TargetPath) && PathUtil.AreNestedOrEqual(BackupPath, TargetPath))
-            return L.T("The second copy must not be in the target folder (or contain it)", "Вторая копия не должна быть в папке-цели (или содержать её)");
+            return Strings.BackupInsideTarget;
         return null;
     }
 
@@ -230,21 +230,20 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         {
             var now = DateTime.Now;
             if (!IsBackupMirror)
-                BackupExample = L.T("Example: ", "Пример: ") + Path.Combine(BackupPath, now.ToString("yyyy-MM-dd HH-mm-ss", System.Globalization.CultureInfo.InvariantCulture), "…", ExampleFileName);
+                BackupExample = Strings.Example + Path.Combine(BackupPath, now.ToString("yyyy-MM-dd HH-mm-ss", System.Globalization.CultureInfo.InvariantCulture), "…", ExampleFileName);
             else if (_template is not null && _nameTemplate is not null)
-                BackupExample = L.T("Example: ", "Пример: ") + Path.Combine(BackupPath, _template.Format(now), _nameTemplate.Format(now, ExampleFileName));
+                BackupExample = Strings.Example + Path.Combine(BackupPath, _template.Format(now), _nameTemplate.Format(now, ExampleFileName));
             if (Directory.Exists(TargetPath) && PathUtil.IsSameVolume(BackupPath, TargetPath!))
-                BackupWarning = L.T("The second copy is on the same drive as the library: if the drive fails, both are lost",
-                    "Вторая копия на том же диске, что и библиотека: при отказе диска пропадут обе");
+                BackupWarning = Strings.BackupOnLibraryDrive;
             else if (Directory.Exists(SourcePath) && PathUtil.IsSameVolume(BackupPath, SourcePath!))
-                BackupWarning = L.T("The second copy is on the same drive as the source", "Вторая копия на том же носителе, что и источник");
+                BackupWarning = Strings.BackupOnSourceDrive;
         }
 
         var parts = new List<string>();
-        if (_nameTemplate is null) parts.Add(L.T("error in the file name template", "ошибка в шаблоне имён"));
-        else if (!_nameTemplate.KeepsOriginalNames) parts.Add(L.T("names — ", "имена — ") + _nameTemplate.Format(DateTime.Now, ExampleFileName));
+        if (_nameTemplate is null) parts.Add(Strings.ErrorInTheFileNameTemplate);
+        else if (!_nameTemplate.KeepsOriginalNames) parts.Add(Strings.AdvancedNames + _nameTemplate.Format(DateTime.Now, ExampleFileName));
         if (IsBackupEnabled)
-            parts.Add(L.T("second copy — ", "вторая копия — ") + (string.IsNullOrWhiteSpace(BackupPath) ? L.T("folder not chosen", "папка не выбрана") : BackupPath));
+            parts.Add(Strings.AdvancedSecondCopy + (string.IsNullOrWhiteSpace(BackupPath) ? Strings.FolderNotChosen : BackupPath));
         AdvancedSummary = parts.Count == 0 ? null : string.Join(" · ", parts);
     }
 
@@ -318,10 +317,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             if (cts != _leftoverCts) return;
             _leftovers = found.Select(f => f.FullName).ToList();
             LeftoversText = _leftovers.Count == 0 ? null
-                : L.T($"The target folder (or the second copy) has {Format.Files(_leftovers.Count)} from an interrupted import (*.importing). "
-                      + "These are redundant unfinished copies: their sources were not deleted.",
-                      $"В папке-цели (или второй копии) {Format.Files(_leftovers.Count)} от прерванного импорта (*.importing). "
-                      + "Это лишние незавершённые копии: исходники для них не удалялись.");
+                : L.F(Strings.TheTargetFolderOrTheSecondCopy, Format.Files(_leftovers.Count));
         }
         catch (Exception ex) when (ex is OperationCanceledException or IOException or UnauthorizedAccessException)
         {
@@ -343,7 +339,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         var path = item.File.Path;
         if (!File.Exists(path))
         {
-            Notice = L.T($"File not found (perhaps already moved): {path}", $"Файл не найден (возможно, уже перемещён): {path}");
+            Notice = L.F(Strings.FileNotFoundPerhapsAlreadyMoved, path);
             return;
         }
         try
@@ -352,7 +348,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         }
         catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or IOException or InvalidOperationException)
         {
-            Notice = L.T($"Could not open “{Path.GetFileName(path)}”: {ex.Message}", $"Не удалось открыть «{Path.GetFileName(path)}»: {ex.Message}");
+            Notice = L.F(Strings.CouldNotOpen, Path.GetFileName(path), ex.Message);
         }
     }
 
@@ -367,17 +363,15 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private async Task DeleteLeftoversAsync()
     {
         var answer = System.Windows.MessageBox.Show(
-            L.T($"Delete {Format.Files(_leftovers.Count)} *.importing left over from an interrupted import?",
-                $"Удалить {Format.Files(_leftovers.Count)} *.importing, оставшихся от прерванного импорта?")
+            L.F(Strings.DeleteImportingLeftOverFromAnInterrupted, Format.Files(_leftovers.Count))
             + Environment.NewLine + Environment.NewLine
-            + L.T("Only files named like “name.xxxxxxxx.importing” are deleted. Photos and videos are not touched.",
-                "Удаляются только файлы с именем вида «имя.xxxxxxxx.importing». Фото и видео не затрагиваются."),
+            + Strings.OnlyFilesNamedLikeNameXxxxxxxxImporting,
             "PhotoShelver", System.Windows.MessageBoxButton.YesNo, System.Windows.MessageBoxImage.Question);
         if (answer != System.Windows.MessageBoxResult.Yes) return;
 
         var failed = await Task.Run(() => ImportLeftovers.Delete(_leftovers));
         if (failed.Count > 0)
-            Notice = L.T($"Could not delete {Format.Files(failed.Count)}: {failed[0].Error}", $"Не удалось удалить {Format.Files(failed.Count)}: {failed[0].Error}");
+            Notice = L.F(Strings.CouldNotDelete, Format.Files(failed.Count), failed[0].Error);
         await FindLeftoversAsync();
     }
 
@@ -404,7 +398,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string? _skippedText;
     [ObservableProperty] private string? _sourcePlaceholder = ChooseSourceText;
 
-    private static string ChooseSourceText => L.T("Choose a folder with photos and videos", "Выберите папку с фото и видео");
+    private static string ChooseSourceText => Strings.ChooseAFolderWithPhotosAndVideos;
     [ObservableProperty] private string? _treePlaceholder;
 
     [ObservableProperty] private bool _isScanning;
@@ -454,7 +448,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand(CanExecute = nameof(IsIdle))]
     private void BrowseSource()
     {
-        var path = PickFolder(L.T("Source folder (import from)", "Папка-источник (откуда импортировать)"), SourcePath);
+        var path = PickFolder(Strings.SourceFolderImportFrom, SourcePath);
         if (path is null) return;
         if (string.Equals(path, SourcePath, StringComparison.OrdinalIgnoreCase)) StartScan();
         else SourcePath = path;
@@ -463,7 +457,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand(CanExecute = nameof(IsIdle))]
     private void BrowseTarget()
     {
-        var path = PickFolder(L.T("Target folder (import to)", "Папка-цель (куда импортировать)"), TargetPath);
+        var path = PickFolder(Strings.TargetFolderImportTo, TargetPath);
         if (path is not null) TargetPath = path;
     }
 
@@ -490,7 +484,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private void CancelImport()
     {
         _importCts?.Cancel();
-        ImportStatus = L.T("Cancelling… the current file will be finished", "Отмена… текущий файл будет завершён");
+        ImportStatus = Strings.CancellingTheCurrentFileWillBeFinished;
     }
 
     private bool CanImport() =>
@@ -518,12 +512,12 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         {
             backup = CurrentBackupPlan(DateTime.Now);
             if (IsBackupEnabled && backup is null)
-                throw new InvalidOperationException(L.T("the second copy is on, but its folder is not set", "вторая копия включена, но папка не задана"));
+                throw new InvalidOperationException(Strings.TheSecondCopyIsOnButIts);
             jobs = ImportPlan.CreateJobs(_items.Where(i => i.IsSelected && i.CanBeImported).Select(i => i.File), target, template, names, backup);
         }
         catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or IOException)
         {
-            Notice = L.T($"Could not prepare the import: {ex.Message}", $"Не удалось подготовить импорт: {ex.Message}");
+            Notice = L.F(Strings.CouldNotPrepareTheImport, ex.Message);
             return;
         }
         if (jobs.Count == 0) return;
@@ -531,8 +525,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         // Only a whole write-protected volume blocks a move; single protected files are copied and kept (see Importer).
         if (mode == ImportMode.Move && PathUtil.IsReadOnlyVolume(jobs[0].SourcePath))
         {
-            Notice = L.T("The source drive is write-protected (e.g. the lock switch of a memory card) — files cannot be moved.",
-                "Носитель-источник защищён от записи (например, переключатель на карте памяти) — файлы нельзя переместить.");
+            Notice = Strings.TheSourceDriveIsWriteProtectedE;
             NoticeHasAction = true;
             return;
         }
@@ -546,14 +539,12 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         }
         if (PathUtil.AvailableFreeSpace(target) is { } free && needed > free)
         {
-            Notice = L.T($"Not enough space on the target drive: {Format.Bytes(needed)} needed, {Format.Bytes(free)} free.",
-                $"Недостаточно места на диске цели: нужно {Format.Bytes(needed)}, свободно {Format.Bytes(free)}.");
+            Notice = L.F(Strings.NotEnoughSpaceOnTheTargetDrive, Format.Bytes(needed), Format.Bytes(free));
             return;
         }
         if (backup is not null && backupNeeded > 0 && PathUtil.AvailableFreeSpace(backup.Root) is { } backupFree && backupNeeded > backupFree)
         {
-            Notice = L.T($"Not enough space for the second copy: {Format.Bytes(backupNeeded)} needed, {Format.Bytes(backupFree)} free.",
-                $"Недостаточно места для второй копии: нужно {Format.Bytes(backupNeeded)}, свободно {Format.Bytes(backupFree)}.");
+            Notice = L.F(Strings.NotEnoughSpaceForTheSecondCopy, Format.Bytes(backupNeeded), Format.Bytes(backupFree));
             return;
         }
 
@@ -565,19 +556,18 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         var token = _importCts.Token;
         var clock = Stopwatch.StartNew();
         ImportProgress = 0;
-        ImportStatus = L.T($"Importing: 0 of {jobs.Count}", $"Импорт: 0 из {jobs.Count}");
+        ImportStatus = L.F(Strings.Importing0Of, jobs.Count);
         IsImporting = true;
 
         var progress = new Progress<ImportProgress>(p =>
         {
             if (token.IsCancellationRequested) return;
             ImportProgress = p.BytesTotal == 0 ? 0 : (double)p.BytesDone / p.BytesTotal;
-            var status = L.T($"Importing: {p.FilesDone} of {p.FilesTotal} · {Format.Bytes(p.BytesDone)} of {Format.Bytes(p.BytesTotal)}",
-                $"Импорт: {p.FilesDone} из {p.FilesTotal} · {Format.Bytes(p.BytesDone)} из {Format.Bytes(p.BytesTotal)}");
+            var status = L.F(Strings.ImportingOfOf, p.FilesDone, p.FilesTotal, Format.Bytes(p.BytesDone), Format.Bytes(p.BytesTotal));
             if (clock.Elapsed > TimeSpan.FromSeconds(2) && p.BytesDone > 0)
             {
                 var remaining = clock.Elapsed * ((double)(p.BytesTotal - p.BytesDone) / p.BytesDone);
-                status += L.T($" · {Format.Duration(remaining)} left", $" · осталось {Format.Duration(remaining)}");
+                status += L.F(Strings.Left, Format.Duration(remaining));
             }
             ImportStatus = status;
         });
@@ -591,7 +581,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         catch (Exception ex)
         {
             // Should not happen (the importer reports per-file errors), but never crash mid-import.
-            Notice = L.T($"The import stopped because of an unexpected error: {ex.Message}", $"Импорт прерван из-за непредвиденной ошибки: {ex.Message}");
+            Notice = L.F(Strings.TheImportStoppedBecauseOfAnUnexpected, ex.Message);
             StartScan();
             return;
         }
@@ -631,7 +621,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         }
         if (!Directory.Exists(path))
         {
-            SourcePlaceholder = L.T("Folder not found", "Папка не найдена");
+            SourcePlaceholder = Strings.FolderNotFound;
             UpdateState();
             return;
         }
@@ -639,7 +629,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         var token = cts.Token;
         IsScanning = true;
         ScanIndeterminate = true;
-        ScanStatus = L.T("Looking for files…", "Поиск файлов…");
+        ScanStatus = Strings.LookingForFiles;
         SourcePlaceholder = null;
         try
         {
@@ -653,7 +643,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             var progress = new Progress<int>(n =>
             {
                 if (token.IsCancellationRequested) return;
-                ScanStatus = L.T($"Reading metadata: {n} of {total}", $"Чтение метаданных: {n} из {total}");
+                ScanStatus = L.F(Strings.ReadingMetadataOf, n, total);
                 ScanProgress = (double)n / Math.Max(1, total);
             });
             await SourceScanner.ReadMetadataAsync(found.Files, _dateReader, progress, token);
@@ -668,7 +658,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             // Show files as selected right away; the duplicate check then unticks duplicates
             // (import stays disabled until it has finished).
             foreach (var item in _items) item.IsSelected = item.CanBeImported;
-            SourcePlaceholder = _items.Count == 0 ? L.T("No photos or videos in this folder", "В этой папке нет фото и видео") : null;
+            SourcePlaceholder = _items.Count == 0 ? Strings.NoPhotosOrVideosInThisFolder : null;
             RebuildRows();
 
             IsScanning = false;
@@ -679,7 +669,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         }
         catch (Exception ex)
         {
-            if (cts == _scanCts) Notice = L.T($"Could not read the source folder: {ex.Message}", $"Не удалось прочитать папку-источник: {ex.Message}");
+            if (cts == _scanCts) Notice = L.F(Strings.CouldNotReadTheSourceFolder, ex.Message);
         }
         finally
         {
@@ -739,7 +729,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         IsCheckingDuplicates = true;
         ScanIndeterminate = false;
         ScanProgress = 0;
-        ScanStatus = L.T("Checking for duplicates…", "Проверка дубликатов…");
+        ScanStatus = Strings.CheckingForDuplicates;
         var progress = new Progress<(int Done, int Total)>(p =>
         {
             if (token.IsCancellationRequested) return;
@@ -760,7 +750,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         catch (Exception ex)
         {
             // Without a duplicate check we cannot promise not to re-import files: block the import and say why.
-            if (cts == _duplicateCts) Notice = L.T($"Could not check for duplicates, import is unavailable: {ex.Message}", $"Не удалось проверить дубликаты, импорт недоступен: {ex.Message}");
+            if (cts == _duplicateCts) Notice = L.F(Strings.CouldNotCheckForDuplicatesImportIs, ex.Message);
         }
         finally
         {
@@ -786,7 +776,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         {
             var list = group.ToList();
             var collapsed = _collapsedDays.Contains(group.Key);
-            var header = new HeaderRow(group.Key, group.Key is { } d ? Format.Date(d) : L.T("Could not be read", "Не удалось прочитать"), list, collapsed);
+            var header = new HeaderRow(group.Key, group.Key is { } d ? Format.Date(d) : Strings.CouldNotBeRead, list, collapsed);
             Rows.Add(header);
             if (!collapsed)
                 foreach (var row in TileRowsOf(header)) Rows.Add(row);
@@ -861,23 +851,23 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         {
             var parts = new List<string>
             {
-                L.T($"Total {items.Count}", $"Всего {items.Count}"),
-                L.T($"New {items.Count(i => i.IsNew)}", $"Новых {items.Count(i => i.IsNew)}"),
+                L.F(Strings.Total, items.Count),
+                L.F(Strings.New, items.Count(i => i.IsNew)),
             };
             var inTarget = items.Count(i => !i.HasError && i.State == DuplicateState.InTarget);
             var inSource = items.Count(i => !i.HasError && i.State == DuplicateState.DuplicateInSource);
             var errors = items.Count(i => i.HasError);
-            if (inTarget > 0) parts.Add(L.T($"Already in target {inTarget}", $"Уже в цели {inTarget}"));
-            if (inSource > 0) parts.Add(L.T($"Duplicates in source {inSource}", $"Дубликатов в источнике {inSource}"));
-            if (errors > 0) parts.Add(L.T($"Errors {errors}", $"Ошибок {errors}"));
-            parts.Add(L.T($"Selected {selected.Count}", $"Выбрано {selected.Count}") + $" ({Format.Bytes(selected.Sum(i => i.File.Size))})");
+            if (inTarget > 0) parts.Add(L.F(Strings.AlreadyInTarget, inTarget));
+            if (inSource > 0) parts.Add(L.F(Strings.DuplicatesInSource, inSource));
+            if (errors > 0) parts.Add(L.F(Strings.SummaryErrors, errors));
+            parts.Add(L.F(Strings.SummarySelected, selected.Count) + $" ({Format.Bytes(selected.Sum(i => i.File.Size))})");
             SummaryText = string.Join(" · ", parts.Select(p => p.Replace(' ', '\u00A0')));
         }
         else
         {
             SummaryText = "";
         }
-        SkippedText = _skippedOther > 0 ? L.T($"Skipped {Format.Files(_skippedOther)} of other types", $"Пропущено {Format.Files(_skippedOther)} других типов") : null;
+        SkippedText = _skippedOther > 0 ? L.F(Strings.SkippedOfOtherTypes, Format.Files(_skippedOther)) : null;
         foreach (var header in Rows.OfType<HeaderRow>()) header.RefreshCounts();
 
         UpdateState();
@@ -894,7 +884,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         if (string.IsNullOrWhiteSpace(target))
         {
             Tree.Clear();
-            TreePlaceholder = L.T("Choose the folder to import to", "Выберите папку, куда импортировать");
+            TreePlaceholder = Strings.ChooseTheFolderToImportTo;
             return;
         }
         if (!Directory.Exists(target) || template is null || IsNested())
@@ -907,7 +897,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         var destinations = selected.Select(i => template.Format(i.File.Date!.Value.Local)).ToList();
         var full = ShowFullTree;
         // Building the tree touches the target disk and can be slow while it is busy (e.g. hashing).
-        if (Tree.Count == 0 && (destinations.Count > 0 || full)) TreePlaceholder = L.T("Building the folder tree…", "Строю дерево папок…");
+        if (Tree.Count == 0 && (destinations.Count > 0 || full)) TreePlaceholder = Strings.BuildingTheFolderTree;
         try
         {
             var nodes = await Task.Run(() => FolderTree.Build(target, destinations, full, template.Depth, cts.Token), cts.Token);
@@ -931,11 +921,11 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             }
 
             TreePlaceholder = nodes.Count > 0 ? null
-                : IsScanning ? L.T("Reading the source files…", "Читаю файлы источника…")
-                : string.IsNullOrWhiteSpace(SourcePath) ? L.T("Choose a source to see where the files will go", "Выберите источник, чтобы увидеть, куда попадут файлы")
-                : !Directory.Exists(SourcePath) ? L.T("Source folder not found", "Папка-источник не найдена")
-                : _items.Count == 0 ? L.T("No photos or videos in the source", "В источнике нет фото и видео")
-                : L.T("No files to import", "Нет файлов для импорта");
+                : IsScanning ? Strings.ReadingTheSourceFiles
+                : string.IsNullOrWhiteSpace(SourcePath) ? Strings.ChooseASourceToSeeWhereThe
+                : !Directory.Exists(SourcePath) ? Strings.SourceFolderNotFound
+                : _items.Count == 0 ? Strings.NoPhotosOrVideosInTheSource
+                : Strings.NoFilesToImport;
         }
         catch (OperationCanceledException)
         {
@@ -977,10 +967,10 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     {
         UpdateAdvanced();
         BlockingReason =
-            !string.IsNullOrWhiteSpace(SourcePath) && !Directory.Exists(SourcePath) ? L.T("Source folder not found", "Папка-источник не найдена") :
-            !string.IsNullOrWhiteSpace(TargetPath) && !Directory.Exists(TargetPath) ? L.T("Target folder not found", "Папка-цель не найдена") :
-            !string.IsNullOrWhiteSpace(TargetPath) && PathUtil.IsReadOnlyVolume(TargetPath!) ? L.T("The target folder is on a write-protected drive", "Папка-цель на носителе, защищённом от записи") :
-            IsNested() ? L.T("The source and the target must not be the same folder or inside one another", "Источник и цель не должны совпадать или находиться одна внутри другой") :
+            !string.IsNullOrWhiteSpace(SourcePath) && !Directory.Exists(SourcePath) ? Strings.SourceFolderNotFound :
+            !string.IsNullOrWhiteSpace(TargetPath) && !Directory.Exists(TargetPath) ? Strings.TargetFolderNotFound :
+            !string.IsNullOrWhiteSpace(TargetPath) && PathUtil.IsReadOnlyVolume(TargetPath!) ? Strings.TheTargetFolderIsOnAWrite :
+            IsNested() ? Strings.TheSourceAndTheTargetMustNot :
             BackupProblem();
 
         OnPropertyChanged(nameof(IsBusy));

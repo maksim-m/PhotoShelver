@@ -26,8 +26,7 @@ public partial class App : Application
         Log(e.Exception);
         e.Handled = true;
         MessageBox.Show(
-            L.T($"An unexpected interface error occurred. The app keeps running.\n\n{e.Exception.Message}\n\nDetails: {LogPath}",
-                $"Произошла непредвиденная ошибка интерфейса. Приложение продолжит работу.\n\n{e.Exception.Message}\n\nПодробности: {LogPath}"),
+            L.F(Strings.AnUnexpectedInterfaceErrorOccurredTheApp, e.Exception.Message, LogPath),
             "PhotoShelver", MessageBoxButton.OK, MessageBoxImage.Warning);
     }
 

@@ -82,7 +82,7 @@ public partial class MainWindow : Window
         if (_vm.IsImporting)
         {
             e.Cancel = true;
-            _vm.Notice = L.T("Import in progress. Wait until it finishes or press “Cancel”.", "Идёт импорт. Дождитесь окончания или нажмите «Отмена».");
+            _vm.Notice = Strings.ImportInProgressWaitUntilItFinishes;
             return;
         }
 

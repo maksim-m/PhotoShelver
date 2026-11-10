@@ -32,7 +32,7 @@ internal static partial class TemplateSyntax
             var c = pattern[i];
             if (c == '}')
             {
-                error = L.T("Extra “}” without “{”", "Лишняя «}» без «{»");
+                error = Strings.ExtraWithout;
                 return false;
             }
             if (c != '{')
@@ -46,7 +46,7 @@ internal static partial class TemplateSyntax
             var nextOpen = pattern.IndexOf('{', i + 1);
             if (close < 0 || (nextOpen >= 0 && nextOpen < close))
             {
-                error = L.T("Missing “}”", "Не хватает «}»");
+                error = Strings.Missing;
                 return false;
             }
             var name = pattern[(i + 1)..close].Trim();
@@ -70,13 +70,13 @@ internal static partial class TemplateSyntax
     private static string UnknownToken(string name, IReadOnlyCollection<string> allowed, IReadOnlyDictionary<string, string> elsewhere)
     {
         if (name.Length == 0)
-            return L.T("Empty braces {}", "Пустые скобки {}");
+            return Strings.EmptyBraces;
         if (elsewhere.TryGetValue(name, out var explanation))
             return explanation;
         var sameLetters = allowed.Where(a => string.Equals(a, name, StringComparison.OrdinalIgnoreCase)).ToList();
         if (sameLetters.Count == 1)
-            return L.T($"Write it as {{{sameLetters[0]}}} (letter case matters)", $"Пишется так: {{{sameLetters[0]}}} (регистр букв важен)");
-        return L.T($"Unknown token {{{name}}}. Available: {List(allowed)}", $"Непонятный токен {{{name}}}. Доступны: {List(allowed)}");
+            return L.F(Strings.WriteItAsLetterCaseMatters, sameLetters[0]);
+        return L.F(Strings.UnknownTokenAvailable, name, List(allowed));
     }
 
     public static string List(IEnumerable<string> tokens) => string.Join(", ", tokens.Select(t => "{" + t + "}"));

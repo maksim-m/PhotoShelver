@@ -36,7 +36,7 @@ public sealed class LanguageTests : IDisposable
     public void RussianPlurals(long n, string expected)
     {
         L.IsRussian = true;
-        Assert.Equal(expected, L.Count(n, "file", "files", "файл", "файла", "файлов"));
+        Assert.Equal(expected, L.Count(n, Strings.FileOne, Strings.FileFew, Strings.FileMany));
     }
 
     [Theory]
@@ -47,18 +47,29 @@ public sealed class LanguageTests : IDisposable
     public void EnglishPlurals(long n, string expected)
     {
         L.IsRussian = false;
-        Assert.Equal(expected, L.Count(n, "file", "files", "файл", "файла", "файлов"));
+        Assert.Equal(expected, L.Count(n, Strings.FileOne, Strings.FileFew, Strings.FileMany));
     }
 
     [Theory]
-    [InlineData("ru-RU", true)]
-    [InlineData("ru", true)]
-    [InlineData("en-US", false)]
-    [InlineData("de-DE", false)]
-    [InlineData("uk-UA", false)]
-    public void SystemLanguageDecides(string culture, bool russian)
+    [InlineData("ru-RU", "ru-RU")]
+    [InlineData("ru", "ru-RU")]        // a neutral culture becomes a specific one (for numbers and dates)
+    [InlineData("ru-KZ", "ru-KZ")]     // Russian in another country: Russian texts, that country's number format
+    [InlineData("en-US", "en-US")]
+    [InlineData("en-GB", "en-US")]     // English is the resource fallback: always en-US
+    [InlineData("de-DE", "en-US")]     // no translation: English, also for numbers and dates (no mixed languages)
+    [InlineData("uk-UA", "en-US")]
+    [InlineData("", "en-US")]          // invariant culture
+    public void SystemLanguageDecidesWhenTranslated(string system, string expected)
     {
-        Assert.Equal(russian, L.IsRussianCulture(CultureInfo.GetCultureInfo(culture)));
+        Assert.Equal(expected, L.Choose(CultureInfo.GetCultureInfo(system)).Name);
+    }
+
+    [Fact]
+    public void OnlyShippedTranslationsCount()
+    {
+        Assert.True(L.IsTranslated("ru"));
+        Assert.False(L.IsTranslated("de"));
+        Assert.False(L.IsTranslated("xx"));
     }
 
     [Fact]
@@ -69,9 +80,43 @@ public sealed class LanguageTests : IDisposable
         Assert.False(L.IsRussian);
         L.Override("ru");
         Assert.True(L.IsRussian);
-        L.Override("de");
+        L.Override("de");      // not translated
+        L.Override("nonsense");
+        L.Override("");
         L.Override(null);
         Assert.True(L.IsRussian); // unchanged
+        L.Override("ru-RU");
+        Assert.Equal("ru-RU", L.Language.Name);
+    }
+
+    [Theory]
+    [InlineData("ru", 1, "one")]
+    [InlineData("ru", 3, "few")]
+    [InlineData("ru", 12, "many")]
+    [InlineData("ru", 22, "few")]
+    [InlineData("pl", 1, "one")]
+    [InlineData("pl", 4, "few")]
+    [InlineData("pl", 13, "many")]
+    [InlineData("pl", 21, "many")] // unlike Russian
+    [InlineData("pl", 24, "few")]
+    [InlineData("de", 1, "one")]
+    [InlineData("de", 3, "many")]
+    [InlineData("de", 0, "many")]
+    public void PluralRulesFollowTheLanguage(string language, long n, string form)
+    {
+        L.Language = CultureInfo.CreateSpecificCulture(language);
+        Assert.Equal($"{n} {form}", L.Count(n, "one", "few", "many"));
+    }
+
+    [Fact]
+    public void TextsFollowTheLanguage()
+    {
+        L.IsRussian = false;
+        Assert.Equal("Copy", Strings.Copy);
+        L.IsRussian = true;
+        Assert.Equal("Копировать", Strings.Copy);
+        L.Language = CultureInfo.GetCultureInfo("de-DE"); // no German resources: English texts
+        Assert.Equal("Copy", Strings.Copy);
     }
 
     [Fact]

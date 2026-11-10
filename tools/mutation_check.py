@@ -216,8 +216,8 @@ UI_MUTATIONS = [
      "if (answer != System.Windows.MessageBoxResult.Yes) return;",
      ""),
     ("Cancel button does nothing", VM,
-     '_importCts?.Cancel();\n        ImportStatus = L.T("Cancelling',
-     '\n        ImportStatus = L.T("Cancelling'),
+     '_importCts?.Cancel();\n        ImportStatus = Strings.CancellingTheCurrentFileWillBeFinished;',
+     '\n        ImportStatus = Strings.CancellingTheCurrentFileWillBeFinished;'),
     ("window can be closed during an import", os.path.join("src", "PhotoShelver.App", "MainWindow.xaml.cs"),
      "if (_vm.IsImporting)",
      "if (false)"),
@@ -243,7 +243,7 @@ UI_MUTATIONS = [
      ".Select(i => i.File), target, template, names, backup);",
      ".Select(i => i.File), target, template, names, null);"),
     ("nested source/target not blocked", VM,
-     'IsNested() ? L.T("The source and the target must not be the same folder or inside one another", "Источник и цель не должны совпадать или находиться одна внутри другой") :',
+     'IsNested() ? Strings.TheSourceAndTheTargetMustNot :',
      ""),
 ]
 

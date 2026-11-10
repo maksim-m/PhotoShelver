@@ -11,4 +11,16 @@
   <ItemGroup>
     <InternalsVisibleTo Include="PhotoShelver.Core.Tests" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- All interface texts: Strings.resx (English) and Strings.<language>.resx (in the project root, so the resource name matches the class). The Strings class is generated at build,
+         so a misspelt key is a compile error. -->
+    <EmbeddedResource Update="Strings.resx">
+      <Generator>MSBuild:Compile</Generator>
+      <StronglyTypedFileName>$(IntermediateOutputPath)Strings.Designer.cs</StronglyTypedFileName>
+      <StronglyTypedLanguage>CSharp</StronglyTypedLanguage>
+      <StronglyTypedNamespace>PhotoShelver.Core</StronglyTypedNamespace>
+      <StronglyTypedClassName>Strings</StronglyTypedClassName>
+      <PublicClass>true</PublicClass>
+    </EmbeddedResource>
+  </ItemGroup>
 </Project>
