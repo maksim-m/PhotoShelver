@@ -6,7 +6,7 @@ using MetadataExtractor.Formats.Exif;
 
 namespace PhotoShelver.Core.Metadata;
 
-/// <summary>Determines the capture date of a photo or video (see SPEC §3).</summary>
+/// <summary>Determines the capture date of a photo or video.</summary>
 public sealed partial class CaptureDateReader
 {
     private readonly TimeZoneInfo _localZone;
@@ -37,7 +37,7 @@ public sealed partial class CaptureDateReader
 
     private static CaptureDate? ReadPhoto(string path) => ExifDate(ImageMetadataReader.ReadMetadata(path));
 
-    /// <summary>Capture date from EXIF: the camera's local clock, used as is (SPEC §3).</summary>
+    /// <summary>Capture date from EXIF: the camera's local clock, used as is.</summary>
     private static CaptureDate? ExifDate(IReadOnlyList<MetadataExtractor.Directory> directories)
     {
         foreach (var dir in directories.OfType<ExifSubIfdDirectory>())

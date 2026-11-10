@@ -47,7 +47,7 @@ public sealed record ImportResult(
     IReadOnlyList<string> Warnings);
 
 /// <summary>
-/// Copies or moves files into the target, never overwriting anything (SPEC §7).
+/// Copies or moves files into the target, never overwriting anything.
 /// </summary>
 public sealed class Importer
 {

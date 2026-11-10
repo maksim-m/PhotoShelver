@@ -103,7 +103,7 @@ public class EndToEndTests
         // Unrelated file with a clashing name → the new IMG_0003 must become IMG_0003_1.
         Directory.CreateDirectory(Path.Combine(target, @"2026\11-07"));
         File.WriteAllText(Path.Combine(target, @"2026\11-07\IMG_0003.JPG"), "unrelated");
-        // Same content as img_0006 but in a different day folder → not considered (SPEC §5), so it is imported.
+        // Same content as img_0006 but in a different day folder → not considered, so it is imported.
         Directory.CreateDirectory(Path.Combine(target, @"2026\11-09"));
         File.Copy(Path.Combine(source, @"photos\img_0006.jpeg"), Path.Combine(target, @"2026\11-09\img_0006.jpeg"));
 

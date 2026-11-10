@@ -20,7 +20,7 @@ public static class DuplicateDetector
 {
     /// <summary>
     /// Classifies source files. Files with errors or without a date are ignored.
-    /// The target check only looks at the top level of the destination folder computed by the template (SPEC §5).
+    /// The target check only looks at the top level of the destination folder computed by the template.
     /// </summary>
     public static Dictionary<SourceFile, DuplicateInfo> Detect(
         IReadOnlyList<SourceFile> files,
