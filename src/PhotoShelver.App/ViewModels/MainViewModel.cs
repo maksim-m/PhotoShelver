@@ -28,6 +28,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     private List<MediaItemViewModel> _items = [];
     private FolderTemplate? _template;
+    private FileNameTemplate? _nameTemplate;
     private int _skippedOther;
     private int _columns = 5;
     private CancellationTokenSource? _scanCts;
@@ -50,7 +51,9 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         IncludeSubfolders = settings.IncludeSubfolders;
         IsMoveMode = settings.MoveMode;
         ShowFullTree = settings.ShowFullTree;
+        NameTemplateText = string.IsNullOrWhiteSpace(settings.NameTemplate) ? FileNameTemplate.Default : settings.NameTemplate;
         ParseTemplate(TemplateText);
+        ParseNameTemplate(NameTemplateText);
         _initializing = false;
     }
 
@@ -66,6 +69,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string? _sourcePath;
     [ObservableProperty] private string? _targetPath;
     [ObservableProperty] private string _templateText = FolderTemplate.Default;
+    [ObservableProperty] private string _nameTemplateText = FileNameTemplate.Default;
     [ObservableProperty] private bool _includeSubfolders = true;
     [ObservableProperty] [NotifyPropertyChangedFor(nameof(IsCopyMode))] private bool _isMoveMode = true;
     [ObservableProperty] private bool _showFullTree = true;
@@ -126,6 +130,51 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     }
 
     [ObservableProperty] private string? _templateWarning;
+
+    // ---------- File name template ("Advanced") ----------
+
+    /// <summary>Original name shown in the examples of the file name template.</summary>
+    private const string ExampleFileName = "IMG_2041.JPG";
+
+    partial void OnNameTemplateTextChanged(string value)
+    {
+        ParseNameTemplate(value);
+        if (!_initializing) UpdateState();
+    }
+
+    private void ParseNameTemplate(string value)
+    {
+        if (FileNameTemplate.TryParse(value, out var names, out var error))
+        {
+            _nameTemplate = names;
+            NameTemplateError = null;
+            NameTemplateWarning = names!.Warning;
+            NameTemplateExample = L.T("Example: ", "Пример: ") + names.Format(DateTime.Now, ExampleFileName);
+            AdvancedSummary = names.KeepsOriginalNames ? null
+                : L.T("names — ", "имена — ") + names.Format(DateTime.Now, ExampleFileName);
+        }
+        else
+        {
+            _nameTemplate = null;
+            NameTemplateError = error;
+            NameTemplateWarning = null;
+            NameTemplateExample = null;
+            AdvancedSummary = L.T("error in the file name template", "ошибка в шаблоне имён");
+        }
+    }
+
+    [ObservableProperty] private string? _nameTemplateError;
+    [ObservableProperty] private string? _nameTemplateWarning;
+    [ObservableProperty] private string? _nameTemplateExample;
+
+    /// <summary>What the collapsed "Advanced" section shows: a non-default setting must stay visible.</summary>
+    [ObservableProperty] private string? _advancedSummary;
+
+    [ObservableProperty] private bool _isAdvancedExpanded;
+
+    public IReadOnlyList<TemplatePreset> NameTemplatePresets { get; } = FileNameTemplate.Presets
+        .Select(p => new TemplatePreset(p, FileNameTemplate.Parse(p).Format(DateTime.Now, ExampleFileName)))
+        .ToList();
 
     /// <summary>Ready-made templates for the drop-down, with an example for today.</summary>
     public IReadOnlyList<TemplatePreset> TemplatePresets { get; } = FolderTemplate.Presets
@@ -250,6 +299,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         settings.SourcePath = SourcePath;
         settings.TargetPath = TargetPath;
         settings.Template = TemplateText;
+        settings.NameTemplate = NameTemplateText;
         settings.IncludeSubfolders = IncludeSubfolders;
         settings.MoveMode = IsMoveMode;
         settings.ShowFullTree = ShowFullTree;
@@ -354,7 +404,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     }
 
     private bool CanImport() =>
-        !IsBusy && DuplicatesChecked && BlockingReason is null && _template is not null && SelectedCount > 0
+        !IsBusy && DuplicatesChecked && BlockingReason is null && _template is not null && _nameTemplate is not null && SelectedCount > 0
         && Directory.Exists(SourcePath) && Directory.Exists(TargetPath);
 
     [RelayCommand(CanExecute = nameof(CanImport))]
@@ -363,11 +413,12 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         Notice = null;
         var target = TargetPath!;
         var template = _template!;
+        var names = _nameTemplate!;
         var mode = IsMoveMode ? ImportMode.Move : ImportMode.Copy;
         List<ImportJob> jobs;
         try
         {
-            jobs = ImportPlan.CreateJobs(_items.Where(i => i.IsSelected && i.CanBeImported).Select(i => i.File), target, template);
+            jobs = ImportPlan.CreateJobs(_items.Where(i => i.IsSelected && i.CanBeImported).Select(i => i.File), target, template, names);
         }
         catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or IOException)
         {
@@ -394,7 +445,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         }
 
         var version = typeof(MainViewModel).Assembly.GetName().Version?.ToString(3) ?? "?";
-        var log = ImportLog.Start(SettingsStore.LogsDirectory, mode, SourcePath!, target, template.Pattern, jobs, version);
+        var log = ImportLog.Start(SettingsStore.LogsDirectory, mode, SourcePath!, target, template.Pattern, jobs, version,
+            nameTemplate: names.KeepsOriginalNames ? null : names.Pattern);
 
         _importCts = new CancellationTokenSource();
         var token = _importCts.Token;

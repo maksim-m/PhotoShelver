@@ -8,6 +8,7 @@ public sealed class AppSettings
     public string? SourcePath { get; set; }
     public string? TargetPath { get; set; }
     public string Template { get; set; } = FolderTemplate.Default;
+    public string NameTemplate { get; set; } = FileNameTemplate.Default;
     public bool IncludeSubfolders { get; set; } = true;
     public bool MoveMode { get; set; } = true;
     public bool ShowFullTree { get; set; } = true;

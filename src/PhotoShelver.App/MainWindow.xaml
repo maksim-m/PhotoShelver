@@ -292,6 +292,43 @@
                 </DockPanel>
                 <TextBlock DockPanel.Dock="Top" Text="{x:Static local:Ui.TemplateLegend}" Style="{StaticResource Secondary}" FontSize="12" Margin="0,2,0,12"/>
 
+                <!-- Advanced: collapsed by default, but a non-default setting stays visible in the header -->
+                <Expander AutomationProperties.AutomationId="Advanced" DockPanel.Dock="Top" IsExpanded="{Binding IsAdvancedExpanded}" Margin="0,0,0,12"
+                          HorizontalAlignment="Stretch">
+                    <Expander.Header>
+                        <TextBlock TextWrapping="Wrap">
+                            <Run Text="{x:Static local:Ui.Advanced}"/><Run AutomationProperties.AutomationId="AdvancedSummary"
+                                Text="{Binding AdvancedSummary, Mode=OneWay, StringFormat='{}: {0}', TargetNullValue=''}" Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                        </TextBlock>
+                    </Expander.Header>
+                    <StackPanel Margin="0,4,0,0">
+                        <TextBlock Text="{x:Static local:Ui.FileNames}" Margin="0,0,0,4"/>
+                        <ComboBox AutomationProperties.AutomationId="NameTemplate" IsEditable="True" IsTextSearchEnabled="False" TextSearch.TextPath="Pattern" IsEnabled="{Binding IsIdle}"
+                                  ItemsSource="{Binding NameTemplatePresets}"
+                                  Text="{Binding NameTemplateText, UpdateSourceTrigger=PropertyChanged}"
+                                  ToolTip="{x:Static local:Ui.NameTemplateTip}">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <DockPanel MinWidth="260">
+                                        <TextBlock DockPanel.Dock="Right" Text="{Binding Example}" Style="{StaticResource Secondary}" Margin="24,0,0,0"/>
+                                        <TextBlock Text="{Binding Pattern}" FontWeight="SemiBold"/>
+                                    </DockPanel>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                        <TextBlock AutomationProperties.AutomationId="NameTemplateExample" Text="{Binding NameTemplateExample}" Style="{StaticResource Secondary}" Margin="0,4,0,0"
+                                   Visibility="{Binding NameTemplateExample, Converter={StaticResource NotNullToVis}}"/>
+                        <TextBlock AutomationProperties.AutomationId="NameTemplateError" Text="{Binding NameTemplateError}" Foreground="{DynamicResource SystemFillColorCriticalBrush}" Margin="0,4,0,0"
+                                   TextWrapping="Wrap" Visibility="{Binding NameTemplateError, Converter={StaticResource NotNullToVis}}"/>
+                        <DockPanel Margin="0,4,0,0" Visibility="{Binding NameTemplateWarning, Converter={StaticResource NotNullToVis}}">
+                            <TextBlock DockPanel.Dock="Left" Text="&#xE7BA;" FontFamily="{StaticResource IconFont}" Margin="0,2,6,0"
+                                       Foreground="{DynamicResource SystemFillColorCautionBrush}"/>
+                            <TextBlock AutomationProperties.AutomationId="NameTemplateWarning" Text="{Binding NameTemplateWarning}" TextWrapping="Wrap"/>
+                        </DockPanel>
+                        <TextBlock Text="{x:Static local:Ui.NameTemplateLegend}" Style="{StaticResource Secondary}" FontSize="12" Margin="0,2,0,0"/>
+                    </StackPanel>
+                </Expander>
+
                 <CheckBox AutomationProperties.AutomationId="ShowFullTree" DockPanel.Dock="Bottom" Content="{x:Static local:Ui.ShowFullTree}" IsChecked="{Binding ShowFullTree}" Margin="0,12,0,0" HorizontalAlignment="Left"/>
                 <Border DockPanel.Dock="Bottom" Margin="0,12,0,0" Padding="12,8" CornerRadius="6"
                         Background="{DynamicResource SystemFillColorCautionBackgroundBrush}"

@@ -25,7 +25,7 @@ public sealed class ImportLog
     public string? Error { get; private set; }
 
     public static ImportLog Start(string directory, ImportMode mode, string source, string target, string template,
-        IReadOnlyCollection<ImportJob> jobs, string appVersion, DateTime? now = null)
+        IReadOnlyCollection<ImportJob> jobs, string appVersion, DateTime? now = null, string? nameTemplate = null)
     {
         var started = now ?? DateTime.Now;
         string path;
@@ -49,6 +49,7 @@ public sealed class ImportLog
             $"{L.T("Source:  ", "Источник:")} {source}{Environment.NewLine}" +
             $"{L.T("Target:  ", "Цель:    ")} {target}{Environment.NewLine}" +
             $"{L.T("Template:", "Шаблон:  ")} {template}{Environment.NewLine}" +
+            (nameTemplate is null ? "" : $"{L.T("Names:   ", "Имена:   ")} {nameTemplate}{Environment.NewLine}") +
             $"{L.T("Files:   ", "Файлов:  ")} {jobs.Count} ({Size(jobs.Sum(j => j.Size))}){Environment.NewLine}{Environment.NewLine}");
         return log;
     }

@@ -24,6 +24,7 @@ TESTS = os.path.join("tests", "PhotoShelver.Core.Tests")
 IMP = os.path.join("src", "PhotoShelver.Core", "Importing", "Importer.cs")
 DUP = os.path.join("src", "PhotoShelver.Core", "Scanning", "DuplicateDetector.cs")
 CDR = os.path.join("src", "PhotoShelver.Core", "Metadata", "CaptureDateReader.cs")
+FNT = os.path.join("src", "PhotoShelver.Core", "FileNameTemplate.cs")
 
 # (description, file, original snippet, mutated snippet)
 MUTATIONS = [
@@ -115,6 +116,21 @@ MUTATIONS = [
     ("TIFF orientation tag not read", os.path.join("src", "PhotoShelver.Core", "Metadata", "EmbeddedPreview.cs"),
      "else if (e.Tag == 0x0112) orientation = tiff.Value(e);",
      ""),
+    ("renamed file moved under its original name (same volume)", IMP,
+     "return PlaceWithSuffix(job.FileName, job.DestinationFolder,",
+     "return PlaceWithSuffix(Path.GetFileName(job.SourcePath), job.DestinationFolder,"),
+    ("renamed file copied under its original name", IMP,
+     "var fileName = job.FileName;",
+     "var fileName = Path.GetFileName(job.SourcePath);"),
+    ("importer accepts a destination name with a path", IMP,
+     "if (!IsPlainFileName(job.FileName))",
+     "if (false)"),
+    ("file name template drops the extension", FNT,
+     "return sb + Path.GetExtension(originalFileName);",
+     "return sb.ToString();"),
+    ("file name template accepts folders", FNT,
+     "if (pattern.IndexOfAny(['/', '\\\\']) >= 0)",
+     "if (false)"),
     ("metadata errors not caught", CDR,
      "catch (Exception ex) when (ex is not (OutOfMemoryException or StackOverflowException or AccessViolationException))\n        {\n            // Malformed",
      "catch (IOException)\n        {\n            // Malformed"),
@@ -152,6 +168,12 @@ UI_MUTATIONS = [
     ("'Show in folder' opens the file instead", VM,
      "private void ShowInFolder(object? parameter) => WithExistingFile(parameter, ShellLauncher.ShowInFolder);",
      "private void ShowInFolder(object? parameter) => WithExistingFile(parameter, ShellLauncher.Open);"),
+    ("invalid file name template does not block the import", VM,
+     "_template is not null && _nameTemplate is not null && SelectedCount > 0",
+     "_template is not null && SelectedCount > 0"),
+    ("collapsed 'Advanced' hides the renaming", VM,
+     'AdvancedSummary = names.KeepsOriginalNames ? null',
+     'AdvancedSummary = true ? null'),
     ("nested source/target not blocked", VM,
      'IsNested() ? L.T("The source and the target must not be the same folder or inside one another", "Источник и цель не должны совпадать или находиться одна внутри другой") :',
      ""),

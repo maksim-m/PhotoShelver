@@ -19,10 +19,20 @@ public static class ImportPlan
         return folder;
     }
 
+    /// <summary>Name of a file in its destination folder: the name template applied, or the original name.</summary>
+    public static string DestinationName(FileNameTemplate? names, SourceFile file)
+    {
+        if (names is null || names.KeepsOriginalNames) return file.FileName;
+        if (file.Date is not { } date)
+            throw new InvalidOperationException(L.T($"No date for file {file.Path}", $"Нет даты для файла {file.Path}"));
+        return names.Format(date.Local, file.FileName);
+    }
+
     /// <summary>Jobs for files that can be imported (readable, with a date), in the given order.</summary>
-    public static List<ImportJob> CreateJobs(IEnumerable<SourceFile> files, string targetRoot, FolderTemplate template) =>
+    public static List<ImportJob> CreateJobs(IEnumerable<SourceFile> files, string targetRoot, FolderTemplate template,
+        FileNameTemplate? names = null) =>
         files
             .Where(f => f.Error is null && f.Date is not null)
-            .Select(f => new ImportJob(f.Path, DestinationFolder(targetRoot, template, f), f.Size))
+            .Select(f => new ImportJob(f.Path, DestinationFolder(targetRoot, template, f), f.Size, DestinationName(names, f)))
             .ToList();
 }

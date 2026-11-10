@@ -30,6 +30,12 @@ public static class Ui
         "Pick a preset or type your own. YYYY — year, YY — year (2 digits), MM — month, MMM — month (Jan…Dec), DD — day, / — subfolder",
         "Выберите вариант или введите свой. YYYY — год, YY — год (2 цифры), MM — месяц, MMM — месяц (Jan…Dec), DD — день, / — вложенная папка");
     public static string TemplateLegend => L.T("YYYY · YY · MM · MMM · DD · / — new level", "YYYY · YY · MM · MMM · DD · / — новый уровень");
+    public static string Advanced => L.T("Advanced", "Дополнительно");
+    public static string FileNames => L.T("File names", "Имена файлов");
+    public static string NameTemplateTip => L.T(
+        "NAME — the original name (keeps names as they are), YYYY, YY, MM, MMM, DD — date, HH, mm, ss — time of the shot. The extension is always kept",
+        "NAME — исходное имя (оставить имена как есть), YYYY, YY, MM, MMM, DD — дата, HH, mm, ss — время съёмки. Расширение всегда сохраняется");
+    public static string NameTemplateLegend => L.T("NAME — original name · YYYY · MM · DD · HH · mm · ss", "NAME — исходное имя · YYYY · MM · DD · HH · mm · ss");
     public static string ShowFullTree => L.T("Show the whole tree", "Показать всё дерево");
     public static string Show => L.T("Show", "Показать");
     public static string Delete => L.T("Delete", "Удалить");

@@ -193,6 +193,23 @@ public sealed class AppSession : IDisposable
     public void SetTemplate(string text) =>
         ((ValuePattern)Find("Template").GetCurrentPattern(ValuePattern.Pattern)).SetValue(text);
 
+    /// <summary>Opens the "Advanced" section (its content exists only when expanded) and types a file name template.</summary>
+    public void SetNameTemplate(string text)
+    {
+        var advanced = Find("Advanced");
+        ((ExpandCollapsePattern)advanced.GetCurrentPattern(ExpandCollapsePattern.Pattern)).Expand();
+        WaitUntil(() => TryFind("NameTemplate") is not null, "file name template field");
+        ((ValuePattern)Find("NameTemplate").GetCurrentPattern(ValuePattern.Pattern)).SetValue(text);
+    }
+
+    /// <summary>Header of the "Advanced" section (shows a non-default setting even when collapsed).</summary>
+    public string AdvancedHeader => string.Join(" ", Find("Advanced")
+        .FindAll(TreeScope.Descendants, new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Text))
+        .Cast<AutomationElement>().Select(e => e.Current.Name).Take(1));
+
+    public void CollapseAdvanced() =>
+        ((ExpandCollapsePattern)Find("Advanced").GetCurrentPattern(ExpandCollapsePattern.Pattern)).Collapse();
+
     /// <summary>Waits until scanning and the duplicate check are over and the summary is shown.</summary>
     public void WaitReady()
     {

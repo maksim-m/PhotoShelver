@@ -11,7 +11,12 @@ public enum ImportMode
     Copy,
 }
 
-public sealed record ImportJob(string SourcePath, string DestinationFolder, long Size);
+/// <param name="DestinationName">Name of the file in the destination folder (null: the source's own name).</param>
+public sealed record ImportJob(string SourcePath, string DestinationFolder, long Size, string? DestinationName = null)
+{
+    /// <summary>The name the file gets in the destination folder (before a _1, _2… suffix on a clash).</summary>
+    public string FileName => DestinationName ?? Path.GetFileName(SourcePath);
+}
 
 public sealed record ImportProgress(int FilesDone, int FilesTotal, long BytesDone, long BytesTotal, string? CurrentFile);
 
@@ -138,6 +143,9 @@ public sealed class Importer
             throw new FileNotFoundException(L.T("Source file not found", "Исходный файл не найден"), job.SourcePath);
         if (SamePath(source.DirectoryName!, job.DestinationFolder))
             throw new IOException(L.T("The file is already in the destination folder", "Файл уже находится в папке назначения"));
+        // Defence in depth: a validated name template can never produce a path or an invalid name.
+        if (!IsPlainFileName(job.FileName))
+            throw new IOException(L.T($"Invalid file name “{job.FileName}”", $"Недопустимое имя файла «{job.FileName}»"));
 
         // Snapshot to detect changes of the source while it is being copied.
         var sizeBefore = source.Length;
@@ -221,14 +229,17 @@ public sealed class Importer
 
     private static bool IsFatal(Exception ex) => ex is OutOfMemoryException or StackOverflowException or AccessViolationException;
 
+    private static bool IsPlainFileName(string name) =>
+        name.Length > 0 && name.Trim() == name && !name.EndsWith('.') && name is not ("." or "..")
+        && name.IndexOfAny(Path.GetInvalidFileNameChars()) < 0;
+
     private static bool SamePath(string a, string b) =>
         string.Equals(PathUtil.WithoutTrailingSeparator(a), PathUtil.WithoutTrailingSeparator(b), StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Rename within the same volume; tries name, name_1, name_2… without overwriting.</summary>
     private string MoveSameVolume(ImportJob job)
     {
-        var fileName = Path.GetFileName(job.SourcePath);
-        return PlaceWithSuffix(fileName, job.DestinationFolder, candidate => File.Move(job.SourcePath, candidate, overwrite: false));
+        return PlaceWithSuffix(job.FileName, job.DestinationFolder, candidate => File.Move(job.SourcePath, candidate, overwrite: false));
     }
 
     /// <summary>
@@ -239,7 +250,7 @@ public sealed class Importer
     /// </summary>
     private (string Path, bool SourceReadFromDevice, UInt128 Hash) CopyViaTemp(ImportJob job, Action<long> onBytes, ISet<string> cachedVolumes)
     {
-        var fileName = Path.GetFileName(job.SourcePath);
+        var fileName = job.FileName;
         string? temp = null;
         var ownsTemp = false; // only ever delete a temp file this call created
         try

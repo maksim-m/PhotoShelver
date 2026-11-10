@@ -17,9 +17,9 @@ public sealed partial class FolderTemplate
 
     private readonly record struct Token(TokenKind Kind, string Text = "");
 
-    private static readonly char[] InvalidChars = ['<', '>', ':', '"', '|', '?', '*'];
+    internal static readonly char[] InvalidChars = ['<', '>', ':', '"', '|', '?', '*'];
 
-    private static readonly HashSet<string> ReservedNames = new(StringComparer.OrdinalIgnoreCase)
+    internal static readonly HashSet<string> ReservedNames = new(StringComparer.OrdinalIgnoreCase)
     {
         "CON", "PRN", "AUX", "NUL",
         "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",

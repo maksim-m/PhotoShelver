@@ -190,6 +190,56 @@ public class UiTests
         Assert.DoesNotContain(app.TreeNodes(), n => n.StartsWith("2026-", StringComparison.Ordinal));
     }
 
+    // ------------------------------------------------------------------ file names
+
+    [UiFact]
+    public async Task FileNameTemplateRenamesImportedFiles()
+    {
+        using var ws = new Workspace();
+        var files = SourceScanner.Enumerate(ws.Card, recursive: true).Files;
+        await SourceScanner.ReadMetadataAsync(files, new CaptureDateReader(), null, default);
+        var before = new[] { Snapshot.Take(ws.Card), Snapshot.Take(ws.Library) };
+
+        using var app = new AppSession(new UiSettings(ws.Card, ws.Library), ws.Root);
+        app.WaitReady();
+        Assert.Equal("Дополнительно", app.AdvancedHeader); // default: original names, nothing to show
+
+        app.SetNameTemplate("YYYY/NAME");
+        app.WaitUntil(() => app.Text("NameTemplateError") is { } e && e.Contains("папки задаются"), "name template error");
+        Assert.False(app.ImportEnabled);
+
+        app.SetNameTemplate("YYYY-MM-DD_NAME");
+        app.WaitUntil(() => app.ImportEnabled, "import enabled with a valid name template");
+        Assert.EndsWith("_IMG_2041.JPG", app.Text("NameTemplateExample"));
+        app.CollapseAdvanced();
+        app.WaitUntil(() => app.AdvancedHeader.Contains("имена — ") && app.AdvancedHeader.EndsWith("_IMG_2041.JPG"),
+            "the collapsed section still shows the renaming");
+
+        var dialog = app.RunImport();
+        Assert.Equal("Импорт завершён", dialog.Headline);
+        Assert.Empty(dialog.Failures);
+
+        var after = new[] { Snapshot.Take(ws.Card), Snapshot.Take(ws.Library) };
+        Invariants.NothingLost(before, after);
+        Invariants.NoTempFiles(ws.Library);
+        var tpl = FolderTemplate.Parse(Template);
+        foreach (var f in files.Where(f => f.Date is not null && f.FileName != "IMG_0001_copy.JPG"))
+        {
+            var name = f.Date!.Value.Local.ToString("yyyy-MM-dd") + "_" + f.FileName;
+            var placed = Path.Combine(ImportPlan.DestinationFolder(ws.Library, tpl, f), name);
+            Assert.True(File.Exists(placed), $"{f.FileName} is not imported as {placed}");
+        }
+
+        var log = Assert.Single(Directory.GetFiles(Path.Combine(ws.Root, "logs"), "import-*.log"));
+        Assert.Contains("Имена:    YYYY-MM-DD_NAME", File.ReadAllLines(log));
+
+        // The template is remembered.
+        app.WaitReady();
+        app.CloseGracefully();
+        using var json = JsonDocument.Parse(File.ReadAllText(app.SettingsPath));
+        Assert.Equal("YYYY-MM-DD_NAME", json.RootElement.GetProperty("NameTemplate").GetString());
+    }
+
     // ------------------------------------------------------------------ selection
 
     [UiFact]
