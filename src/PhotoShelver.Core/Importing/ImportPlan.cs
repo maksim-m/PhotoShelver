@@ -6,7 +6,7 @@ namespace PhotoShelver.Core.Importing;
 /// <summary>How the second copy is laid out.</summary>
 public enum BackupLayout
 {
-    /// <summary>A folder per import ("2026-11-10 14-32-05"), with the source's folders and original names (like Lightroom).</summary>
+    /// <summary>A folder per import ("2026-11-10 14-32-05"), with the source's folders and original names.</summary>
     PerImport,
 
     /// <summary>The same folders and names as in the library (a mirror of the import).</summary>

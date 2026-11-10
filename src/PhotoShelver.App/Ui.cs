@@ -37,8 +37,12 @@ public static class Ui
         "Токены в фигурных скобках: {NAME} — исходное имя (один {NAME} — имена как есть), {YYYY}, {YY}, {MM}, {MMM}, {DD} — дата, {HH}, {mm}, {ss} — время съёмки. Текст вне скобок остаётся как есть; расширение всегда сохраняется");
     public static string NameTemplateLegend => L.T("{NAME} — original name · {YYYY} · {MM} · {DD} · {HH} · {mm} · {ss}", "{NAME} — исходное имя · {YYYY} · {MM} · {DD} · {HH} · {mm} · {ss}");
     public static string SecondCopy => L.T("Second copy", "Вторая копия");
-    public static string BackupPerImport => L.T("A folder per import, original names (like Lightroom)", "Папка на каждый импорт, исходные имена (как в Lightroom)");
-    public static string BackupMirror => L.T("The same folders and names as in the library", "Те же папки и имена, что в библиотеке");
+    public static string BackupPerImport => L.T(
+        "A new folder for each import, files as on the card (same subfolders and names)",
+        "Новая папка на каждый импорт, файлы как на карте (те же подпапки и имена)");
+    public static string BackupMirror => L.T(
+        "A copy of the library: the same date folders and file names",
+        "Копия библиотеки: те же папки по датам и имена файлов");
     public static string BackupTip => L.T(
         "Every imported file is also copied here and verified. When moving, the source is deleted only after both copies are verified",
         "Каждый импортируемый файл копируется ещё и сюда и проверяется. При перемещении исходник удаляется только после проверки обеих копий");
