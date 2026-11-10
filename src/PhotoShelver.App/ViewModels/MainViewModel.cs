@@ -23,7 +23,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private readonly DispatcherTimer _refreshTimer;
     private readonly DispatcherTimer _templateTimer;
     private readonly DispatcherTimer _environmentTimer;
-    private (bool Source, bool Target) _foldersExist;
+    private (bool Source, bool Target, bool Backup) _foldersExist;
     private readonly bool _initializing;
 
     private List<MediaItemViewModel> _items = [];
@@ -52,9 +52,13 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         IsMoveMode = settings.MoveMode;
         ShowFullTree = settings.ShowFullTree;
         NameTemplateText = string.IsNullOrWhiteSpace(settings.NameTemplate) ? FileNameTemplate.Default : settings.NameTemplate;
+        IsBackupEnabled = settings.BackupEnabled;
+        BackupPath = settings.BackupPath;
+        IsBackupMirror = settings.BackupMirror;
         ParseTemplate(TemplateText);
         ParseNameTemplate(NameTemplateText);
         _initializing = false;
+        UpdateAdvanced();
     }
 
     /// <summary>Raised after an import finishes.</summary>
@@ -150,8 +154,6 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             NameTemplateError = null;
             NameTemplateWarning = names!.Warning;
             NameTemplateExample = L.T("Example: ", "Пример: ") + names.Format(DateTime.Now, ExampleFileName);
-            AdvancedSummary = names.KeepsOriginalNames ? null
-                : L.T("names — ", "имена — ") + names.Format(DateTime.Now, ExampleFileName);
         }
         else
         {
@@ -159,8 +161,89 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             NameTemplateError = error;
             NameTemplateWarning = null;
             NameTemplateExample = null;
-            AdvancedSummary = L.T("error in the file name template", "ошибка в шаблоне имён");
         }
+    }
+
+    // ---------- Second copy ("Advanced") ----------
+
+    [ObservableProperty] private bool _isBackupEnabled;
+    [ObservableProperty] private string? _backupPath;
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(IsBackupPerImport))] private bool _isBackupMirror;
+
+    public bool IsBackupPerImport
+    {
+        get => !IsBackupMirror;
+        set => IsBackupMirror = !value;
+    }
+
+    partial void OnIsBackupEnabledChanged(bool value) => OnBackupChanged();
+    partial void OnBackupPathChanged(string? value) => OnBackupChanged();
+    partial void OnIsBackupMirrorChanged(bool value) => OnBackupChanged();
+
+    private void OnBackupChanged()
+    {
+        if (_initializing) return;
+        Notice = null;
+        UpdateState();
+        _ = FindLeftoversAsync();
+    }
+
+    [ObservableProperty] private string? _backupExample;
+    [ObservableProperty] private string? _backupWarning;
+
+    [RelayCommand(CanExecute = nameof(IsIdle))]
+    private void BrowseBackup()
+    {
+        var path = PickFolder(L.T("Folder for the second copy", "Папка для второй копии"), BackupPath);
+        if (path is not null) BackupPath = path;
+    }
+
+    /// <summary>Why the import cannot run with the chosen second copy, or null (also null when it is off).</summary>
+    private string? BackupProblem()
+    {
+        if (!IsBackupEnabled) return null;
+        if (string.IsNullOrWhiteSpace(BackupPath))
+            return L.T("Choose a folder for the second copy (Advanced)", "Выберите папку для второй копии (Дополнительно)");
+        if (!Directory.Exists(BackupPath))
+            return L.T("The folder for the second copy is not found", "Папка для второй копии не найдена");
+        if (!string.IsNullOrWhiteSpace(SourcePath) && PathUtil.AreNestedOrEqual(BackupPath, SourcePath))
+            return L.T("The second copy must not be in the source folder (or contain it)", "Вторая копия не должна быть в папке-источнике (или содержать её)");
+        if (!string.IsNullOrWhiteSpace(TargetPath) && PathUtil.AreNestedOrEqual(BackupPath, TargetPath))
+            return L.T("The second copy must not be in the target folder (or contain it)", "Вторая копия не должна быть в папке-цели (или содержать её)");
+        return null;
+    }
+
+    /// <summary>The second copy as planned for an import starting now (null when it is off).</summary>
+    private BackupPlan? CurrentBackupPlan(DateTime started) =>
+        !IsBackupEnabled || BackupPath is null || SourcePath is null ? null
+        : IsBackupMirror ? new BackupPlan(BackupPath, BackupLayout.Mirror, SourcePath)
+        : new BackupPlan(BackupPath, BackupLayout.PerImport, SourcePath, ImportPlan.NewSessionFolder(BackupPath, started));
+
+    /// <summary>Example, warning and the collapsed header of the "Advanced" section.</summary>
+    private void UpdateAdvanced()
+    {
+        BackupExample = null;
+        BackupWarning = null;
+        if (IsBackupEnabled && BackupProblem() is null && BackupPath is not null)
+        {
+            var now = DateTime.Now;
+            if (!IsBackupMirror)
+                BackupExample = L.T("Example: ", "Пример: ") + Path.Combine(BackupPath, now.ToString("yyyy-MM-dd HH-mm-ss", System.Globalization.CultureInfo.InvariantCulture), "…", ExampleFileName);
+            else if (_template is not null && _nameTemplate is not null)
+                BackupExample = L.T("Example: ", "Пример: ") + Path.Combine(BackupPath, _template.Format(now), _nameTemplate.Format(now, ExampleFileName));
+            if (Directory.Exists(TargetPath) && PathUtil.IsSameVolume(BackupPath, TargetPath!))
+                BackupWarning = L.T("The second copy is on the same drive as the library: if the drive fails, both are lost",
+                    "Вторая копия на том же диске, что и библиотека: при отказе диска пропадут обе");
+            else if (Directory.Exists(SourcePath) && PathUtil.IsSameVolume(BackupPath, SourcePath!))
+                BackupWarning = L.T("The second copy is on the same drive as the source", "Вторая копия на том же носителе, что и источник");
+        }
+
+        var parts = new List<string>();
+        if (_nameTemplate is null) parts.Add(L.T("error in the file name template", "ошибка в шаблоне имён"));
+        else if (!_nameTemplate.KeepsOriginalNames) parts.Add(L.T("names — ", "имена — ") + _nameTemplate.Format(DateTime.Now, ExampleFileName));
+        if (IsBackupEnabled)
+            parts.Add(L.T("second copy — ", "вторая копия — ") + (string.IsNullOrWhiteSpace(BackupPath) ? L.T("folder not chosen", "папка не выбрана") : BackupPath));
+        AdvancedSummary = parts.Count == 0 ? null : string.Join(" · ", parts);
     }
 
     [ObservableProperty] private string? _nameTemplateError;
@@ -192,7 +275,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     private void CheckFolders()
     {
-        var now = (Directory.Exists(SourcePath), Directory.Exists(TargetPath));
+        var now = (Directory.Exists(SourcePath), Directory.Exists(TargetPath), Directory.Exists(BackupPath));
         if (now == _foldersExist) return;
         _foldersExist = now;
         UpdateState();
@@ -201,7 +284,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     public void Initialize()
     {
-        _foldersExist = (Directory.Exists(SourcePath), Directory.Exists(TargetPath));
+        _foldersExist = (Directory.Exists(SourcePath), Directory.Exists(TargetPath), Directory.Exists(BackupPath));
         _environmentTimer.Start();
         StartScan();
         _ = FindLeftoversAsync();
@@ -218,8 +301,10 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     {
         _leftoverCts?.Cancel();
         var cts = _leftoverCts = new CancellationTokenSource();
-        var target = TargetPath;
-        if (string.IsNullOrWhiteSpace(target) || !Directory.Exists(target))
+        // Leftovers can be in the target and in the folder of second copies.
+        var roots = new[] { TargetPath, IsBackupEnabled ? BackupPath : null }
+            .Where(r => !string.IsNullOrWhiteSpace(r) && Directory.Exists(r)).Select(r => r!).ToList();
+        if (roots.Count == 0)
         {
             _leftovers = [];
             LeftoversText = null;
@@ -227,13 +312,13 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         }
         try
         {
-            var found = await Task.Run(() => ImportLeftovers.Find(target, cts.Token), cts.Token);
+            var found = await Task.Run(() => roots.SelectMany(r => ImportLeftovers.Find(r, cts.Token)).ToList(), cts.Token);
             if (cts != _leftoverCts) return;
             _leftovers = found.Select(f => f.FullName).ToList();
             LeftoversText = _leftovers.Count == 0 ? null
-                : L.T($"The target folder has {Format.Files(_leftovers.Count)} from an interrupted import (*.importing). "
+                : L.T($"The target folder (or the second copy) has {Format.Files(_leftovers.Count)} from an interrupted import (*.importing). "
                       + "These are redundant unfinished copies: their sources were not deleted.",
-                      $"В папке-цели {Format.Files(_leftovers.Count)} от прерванного импорта (*.importing). "
+                      $"В папке-цели (или второй копии) {Format.Files(_leftovers.Count)} от прерванного импорта (*.importing). "
                       + "Это лишние незавершённые копии: исходники для них не удалялись.");
         }
         catch (Exception ex) when (ex is OperationCanceledException or IOException or UnauthorizedAccessException)
@@ -303,6 +388,9 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         settings.IncludeSubfolders = IncludeSubfolders;
         settings.MoveMode = IsMoveMode;
         settings.ShowFullTree = ShowFullTree;
+        settings.BackupEnabled = IsBackupEnabled;
+        settings.BackupPath = BackupPath;
+        settings.BackupMirror = IsBackupMirror;
     }
 
     // ---------- Output state ----------
@@ -415,10 +503,12 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         var template = _template!;
         var names = _nameTemplate!;
         var mode = IsMoveMode ? ImportMode.Move : ImportMode.Copy;
+        BackupPlan? backup;
         List<ImportJob> jobs;
         try
         {
-            jobs = ImportPlan.CreateJobs(_items.Where(i => i.IsSelected && i.CanBeImported).Select(i => i.File), target, template, names);
+            backup = CurrentBackupPlan(DateTime.Now);
+            jobs = ImportPlan.CreateJobs(_items.Where(i => i.IsSelected && i.CanBeImported).Select(i => i.File), target, template, names, backup);
         }
         catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or IOException)
         {
@@ -437,16 +527,28 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         }
 
         var needed = jobs.Where(j => mode == ImportMode.Copy || !PathUtil.IsSameVolume(j.SourcePath, target)).Sum(j => j.Size);
+        var backupNeeded = backup is null ? 0 : jobs.Sum(j => j.Size); // a mirror may already hold some: counted all the same
+        if (backup is not null && PathUtil.IsSameVolume(backup.Root, target))
+        {
+            needed += backupNeeded;
+            backupNeeded = 0;
+        }
         if (PathUtil.AvailableFreeSpace(target) is { } free && needed > free)
         {
             Notice = L.T($"Not enough space on the target drive: {Format.Bytes(needed)} needed, {Format.Bytes(free)} free.",
                 $"Недостаточно места на диске цели: нужно {Format.Bytes(needed)}, свободно {Format.Bytes(free)}.");
             return;
         }
+        if (backup is not null && backupNeeded > 0 && PathUtil.AvailableFreeSpace(backup.Root) is { } backupFree && backupNeeded > backupFree)
+        {
+            Notice = L.T($"Not enough space for the second copy: {Format.Bytes(backupNeeded)} needed, {Format.Bytes(backupFree)} free.",
+                $"Недостаточно места для второй копии: нужно {Format.Bytes(backupNeeded)}, свободно {Format.Bytes(backupFree)}.");
+            return;
+        }
 
         var version = typeof(MainViewModel).Assembly.GetName().Version?.ToString(3) ?? "?";
         var log = ImportLog.Start(SettingsStore.LogsDirectory, mode, SourcePath!, target, template.Pattern, jobs, version,
-            nameTemplate: names.KeepsOriginalNames ? null : names.Pattern);
+            nameTemplate: names.KeepsOriginalNames ? null : names.Pattern, backup: backup);
 
         _importCts = new CancellationTokenSource();
         var token = _importCts.Token;
@@ -862,16 +964,18 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     private void UpdateState()
     {
+        UpdateAdvanced();
         BlockingReason =
             !string.IsNullOrWhiteSpace(SourcePath) && !Directory.Exists(SourcePath) ? L.T("Source folder not found", "Папка-источник не найдена") :
             !string.IsNullOrWhiteSpace(TargetPath) && !Directory.Exists(TargetPath) ? L.T("Target folder not found", "Папка-цель не найдена") :
             IsNested() ? L.T("The source and the target must not be the same folder or inside one another", "Источник и цель не должны совпадать или находиться одна внутри другой") :
-            null;
+            BackupProblem();
 
         OnPropertyChanged(nameof(IsBusy));
         ImportCommand.NotifyCanExecuteChanged();
         BrowseSourceCommand.NotifyCanExecuteChanged();
         BrowseTargetCommand.NotifyCanExecuteChanged();
+        BrowseBackupCommand.NotifyCanExecuteChanged();
         DeleteLeftoversCommand.NotifyCanExecuteChanged();
 
         // The target or template is no longer the one the duplicates were checked for (e.g. the target disk

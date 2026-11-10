@@ -12,10 +12,23 @@ public enum ImportMode
 }
 
 /// <param name="DestinationName">Name of the file in the destination folder (null: the source's own name).</param>
-public sealed record ImportJob(string SourcePath, string DestinationFolder, long Size, string? DestinationName = null)
+/// <param name="BackupFolder">Folder of the second copy (null: no second copy).</param>
+/// <param name="BackupName">Name of the second copy (null: the source's own name).</param>
+/// <param name="BackupReusesIdentical">
+/// A file with identical content already in <paramref name="BackupFolder"/> counts as the second copy (mirror layout:
+/// a file imported again after it was removed from the library is not copied there a second time).
+/// </param>
+public sealed record ImportJob(string SourcePath, string DestinationFolder, long Size, string? DestinationName = null,
+    string? BackupFolder = null, string? BackupName = null, bool BackupReusesIdentical = false)
 {
     /// <summary>The name the file gets in the destination folder (before a _1, _2… suffix on a clash).</summary>
     public string FileName => DestinationName ?? Path.GetFileName(SourcePath);
+
+    /// <summary>The name of the second copy (before a suffix on a clash).</summary>
+    public string BackupFileName => BackupName ?? Path.GetFileName(SourcePath);
+
+    /// <summary>Bytes written for this job: one copy, or two with a second copy.</summary>
+    public long BytesToWrite => BackupFolder is null ? Size : 2 * Size;
 }
 
 public sealed record ImportProgress(int FilesDone, int FilesTotal, long BytesDone, long BytesTotal, string? CurrentFile);
@@ -23,7 +36,8 @@ public sealed record ImportProgress(int FilesDone, int FilesTotal, long BytesDon
 public sealed record ImportFailure(string SourcePath, string Message);
 
 /// <param name="Hash">xxHash128 of the verified content (null for a same-volume rename, which does not read the file).</param>
-public sealed record ImportedFile(string SourcePath, string DestinationPath, UInt128? Hash = null);
+/// <param name="BackupPath">The verified second copy, or null when there is none.</param>
+public sealed record ImportedFile(string SourcePath, string DestinationPath, UInt128? Hash = null, string? BackupPath = null);
 
 /// <param name="Warnings">Non-fatal remarks about the import as a whole (e.g. a weaker verification on some volume).</param>
 public sealed record ImportResult(
@@ -84,7 +98,7 @@ public sealed class Importer
         var failures = new List<ImportFailure>();
         var cachedVolumes = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
         var warnings = new List<string>();
-        var bytesTotal = jobs.Sum(j => j.Size);
+        var bytesTotal = jobs.Sum(j => j.BytesToWrite);
         long bytesDone = 0;
         var clock = Stopwatch.StartNew();
         var lastReport = TimeSpan.MinValue;
@@ -117,7 +131,7 @@ public sealed class Importer
                 // Any per-file problem is reported; the source is never deleted on this path.
                 failures.Add(new ImportFailure(job.SourcePath, ex.Message));
             }
-            bytesDone = startBytes + job.Size;
+            bytesDone = startBytes + job.BytesToWrite;
             onFileDone?.Invoke(new ImportFileOutcome(
                 job,
                 imported.Count > importedBefore ? imported[^1] : null,
@@ -146,25 +160,83 @@ public sealed class Importer
         // Defence in depth: a validated name template can never produce a path or an invalid name.
         if (!IsPlainFileName(job.FileName))
             throw new IOException(L.T($"Invalid file name “{job.FileName}”", $"Недопустимое имя файла «{job.FileName}»"));
+        if (job.BackupFolder is not null)
+        {
+            if (!IsPlainFileName(job.BackupFileName))
+                throw new IOException(L.T($"Invalid file name “{job.BackupFileName}”", $"Недопустимое имя файла «{job.BackupFileName}»"));
+            if (SamePath(source.DirectoryName!, job.BackupFolder) || SamePath(job.DestinationFolder, job.BackupFolder))
+                throw new IOException(L.T("The second copy would be in the same folder as the source or the imported file",
+                    "Вторая копия оказалась бы в одной папке с исходным или импортированным файлом"));
+        }
 
         // Snapshot to detect changes of the source while it is being copied.
         var sizeBefore = source.Length;
         var writeTimeBefore = source.LastWriteTimeUtc;
 
-        Directory.CreateDirectory(job.DestinationFolder);
-
-        if (mode == ImportMode.Move && !TreatAsDifferentVolumes && PathUtil.IsSameVolume(job.SourcePath, job.DestinationFolder))
+        // The second copy is made first, from the source: a move can then still be an atomic rename. If it fails,
+        // the file is imported all the same, but the source stays where it is (a move never leaves fewer than two copies).
+        Backup? backup = null;
+        string? backupError = null;
+        if (job.BackupFolder is not null)
         {
-            // Atomic rename: the file is either still at the source or already at the destination.
-            var moved = MoveSameVolume(job);
-            imported.Add(new ImportedFile(job.SourcePath, moved));
-            // A renamed file keeps its attributes; files in the library are always writable (copies are created writable).
-            ClearReadOnly(moved, warnings);
+            try
+            {
+                backup = PlaceBackup(job, onBytes, cachedVolumes);
+            }
+            catch (Exception ex) when (!IsFatal(ex))
+            {
+                backupError = ex.Message;
+            }
+        }
+        var backupBytes = job.BackupFolder is null ? 0 : job.Size;
+
+        string dest;
+        bool sourceReadFromDevice;
+        UInt128 hash;
+        try
+        {
+            Directory.CreateDirectory(job.DestinationFolder);
+
+            if (mode == ImportMode.Move && backupError is null && !TreatAsDifferentVolumes && PathUtil.IsSameVolume(job.SourcePath, job.DestinationFolder))
+            {
+                // The new second copy is committed to its disk before the source is renamed away.
+                if (backup is { IsNew: true })
+                    TransientRetry.Run(() => CommitPlaced(backup.Path), RetryDelays);
+                // Atomic rename: the file is either still at the source or already at the destination.
+                var moved = MoveSameVolume(job);
+                imported.Add(new ImportedFile(job.SourcePath, moved, null, backup?.Path));
+                // A renamed file keeps its attributes; files in the library are always writable (copies are created writable).
+                ClearReadOnly(moved, warnings);
+                return;
+            }
+
+            (dest, sourceReadFromDevice, hash) = CopyViaTemp(job.SourcePath, job.DestinationFolder, job.FileName,
+                b => onBytes(backupBytes + b), cachedVolumes);
+        }
+        catch (Exception ex) when (!IsFatal(ex) && backup is not null)
+        {
+            // Nothing in the library (the source is where it was): say where the second copy is.
+            failures.Add(new ImportFailure(job.SourcePath, ex.Message + L.T($" (the second copy is in “{backup.Path}”)", $" (вторая копия — «{backup.Path}»)")));
             return;
         }
+        imported.Add(new ImportedFile(job.SourcePath, dest, hash, backup?.Path));
 
-        var (dest, sourceReadFromDevice, hash) = CopyViaTemp(job, onBytes, cachedVolumes);
-        imported.Add(new ImportedFile(job.SourcePath, dest, hash));
+        if (backupError is not null)
+        {
+            failures.Add(new ImportFailure(job.SourcePath, mode == ImportMode.Move
+                ? L.T($"Copied to “{dest}”, but the second copy was not made, so the source was not deleted: {backupError}",
+                    $"Скопирован в «{dest}», но вторая копия не создана, поэтому исходный файл не удалён: {backupError}")
+                : L.T($"Copied to “{dest}”, but the second copy was not made: {backupError}",
+                    $"Скопирован в «{dest}», но вторая копия не создана: {backupError}")));
+            return;
+        }
+        if (backup is not null && backup.Hash != hash)
+        {
+            // Each copy was verified against the source at its own time: the source changed in between.
+            failures.Add(new ImportFailure(job.SourcePath, L.T($"Copied to “{dest}”, but the source changed between the two copies; the source was not deleted",
+                $"Скопирован в «{dest}», но исходный файл изменился между двумя копиями; исходный файл не удалён")));
+            return;
+        }
         if (mode != ImportMode.Move) return;
 
         // Cross-volume move: delete the source only if it is exactly what was copied and verified.
@@ -193,8 +265,10 @@ public sealed class Importer
         {
             // The rename "temp → final name" may still sit in the target's cache, while deleting from a card is written
             // at once: after a power cut or a crash the target could hold only the temp file and the card nothing.
-            // So the placed file is committed to the disk first.
+            // So the placed file (and a new second copy) is committed to the disk first.
             TransientRetry.Run(() => CommitPlaced(dest), RetryDelays);
+            if (backup is { IsNew: true })
+                TransientRetry.Run(() => CommitPlaced(backup.Path), RetryDelays);
         }
         catch (Exception ex) when (!IsFatal(ex))
         {
@@ -211,6 +285,35 @@ public sealed class Importer
             failures.Add(new ImportFailure(job.SourcePath, L.T($"Copied to “{dest}”, but the source was not deleted: {ex.Message}",
                 $"Скопирован в «{dest}», но исходный файл не удалён: {ex.Message}")));
         }
+    }
+
+    /// <param name="IsNew">False when an identical file already in the folder counts as the second copy (mirror layout).</param>
+    private sealed record Backup(string Path, UInt128 Hash, bool IsNew);
+
+    /// <summary>Makes the verified second copy of the source (or finds an identical one, when the job allows it).</summary>
+    private Backup PlaceBackup(ImportJob job, Action<long> onBytes, ISet<string> cachedVolumes)
+    {
+        Directory.CreateDirectory(job.BackupFolder!);
+        if (job.BackupReusesIdentical && FindIdentical(job.SourcePath, job.Size, job.BackupFolder!) is { } same)
+            return same;
+        var (path, _, hash) = CopyViaTemp(job.SourcePath, job.BackupFolder!, job.BackupFileName, onBytes, cachedVolumes);
+        return new Backup(path, hash, IsNew: true);
+    }
+
+    /// <summary>A file directly in <paramref name="folder"/> with the same content as the source, both read from their devices.</summary>
+    private Backup? FindIdentical(string sourcePath, long size, string folder)
+    {
+        var candidates = new DirectoryInfo(folder).EnumerateFiles()
+            .Where(f => f.Length == size && !ImportLeftovers.IsLeftover(f.Name))
+            .ToList();
+        if (candidates.Count == 0) return null;
+        var sourceHash = FileHasher.HashFromDisk(sourcePath, forceCached: ForceCachedVerification).Hash;
+        foreach (var candidate in candidates)
+        {
+            if (FileHasher.HashFromDisk(candidate.FullName, forceCached: ForceCachedVerification).Hash == sourceHash)
+                return new Backup(candidate.FullName, sourceHash, IsNew: false);
+        }
+        return null;
     }
 
     private static void ClearReadOnly(string path, List<string> warnings)
@@ -249,9 +352,9 @@ public sealed class Importer
     /// re-read from its device; both must match the data that was copied. On any mismatch nothing is placed.
     /// Returns the placed path and whether the source re-read really came from the device.
     /// </summary>
-    private (string Path, bool SourceReadFromDevice, UInt128 Hash) CopyViaTemp(ImportJob job, Action<long> onBytes, ISet<string> cachedVolumes)
+    private (string Path, bool SourceReadFromDevice, UInt128 Hash) CopyViaTemp(string sourcePath, string folder, string fileName,
+        Action<long> onBytes, ISet<string> cachedVolumes)
     {
-        var fileName = job.FileName;
         string? temp = null;
         var ownsTemp = false; // only ever delete a temp file this call created
         try
@@ -259,10 +362,10 @@ public sealed class Importer
             UInt128 copiedHash = default;
             for (var attempt = 1; ; attempt++)
             {
-                temp = Path.Combine(job.DestinationFolder, TempFileName?.Invoke(fileName) ?? $"{fileName}.{Random.Shared.Next():x8}.importing");
+                temp = Path.Combine(folder, TempFileName?.Invoke(fileName) ?? $"{fileName}.{Random.Shared.Next():x8}.importing");
                 try
                 {
-                    copiedHash = CopyAndHash(job.SourcePath, temp, onBytes, () => ownsTemp = true);
+                    copiedHash = CopyAndHash(sourcePath, temp, onBytes, () => ownsTemp = true);
                     break;
                 }
                 catch (IOException) when (!ownsTemp && File.Exists(temp) && attempt < TempNameAttempts)
@@ -272,17 +375,17 @@ public sealed class Importer
             }
             AfterTempWritten?.Invoke(temp);
 
-            var (copyOnDisk, sourceOnDevice) = ReadBothFromDevice(temp, job.SourcePath);
+            var (copyOnDisk, sourceOnDevice) = ReadBothFromDevice(temp, sourcePath);
             if (copyOnDisk.Hash != copiedHash)
                 throw new InvalidDataException(L.T("The copy on the disk does not match the data that was read (write error). The file was not imported",
                     "Копия на диске не совпадает с прочитанными данными (ошибка записи). Файл не импортирован"));
             if (sourceOnDevice.Hash != copiedHash)
                 throw new InvalidDataException(L.T("The source reads differently from what was copied (unstable reading or the file changed). The file was not imported",
                     "Исходный файл при повторном чтении отличается от скопированного (нестабильное чтение или файл изменился). Файл не импортирован"));
-            if (!copyOnDisk.BypassedCache) cachedVolumes.Add(VolumeLabel(job.DestinationFolder));
-            if (!sourceOnDevice.BypassedCache) cachedVolumes.Add(VolumeLabel(job.SourcePath));
+            if (!copyOnDisk.BypassedCache) cachedVolumes.Add(VolumeLabel(folder));
+            if (!sourceOnDevice.BypassedCache) cachedVolumes.Add(VolumeLabel(sourcePath));
 
-            var src = new FileInfo(job.SourcePath);
+            var src = new FileInfo(sourcePath);
             try
             {
                 File.SetCreationTimeUtc(temp, src.CreationTimeUtc);
@@ -294,7 +397,7 @@ public sealed class Importer
             }
 
             var tempPath = temp;
-            var placed = PlaceWithSuffix(fileName, job.DestinationFolder, candidate => File.Move(tempPath, candidate, overwrite: false));
+            var placed = PlaceWithSuffix(fileName, folder, candidate => File.Move(tempPath, candidate, overwrite: false));
             ownsTemp = false; // it has become the imported file
             return (placed, sourceOnDevice.BypassedCache, copiedHash);
         }

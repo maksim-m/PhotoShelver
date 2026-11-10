@@ -248,6 +248,100 @@ public class UiTests
         Assert.Equal("{YYYY}-{MM}-{DD}_{NAME}", json.RootElement.GetProperty("NameTemplate").GetString());
     }
 
+    // ------------------------------------------------------------------ second copy
+
+    [UiFact]
+    public void SecondCopyPerImportWhenMoving()
+    {
+        using var ws = new Workspace();
+        var backup = Path.Combine(ws.Root, "backup");
+        Directory.CreateDirectory(backup);
+        var cardBefore = Snapshot.Take(ws.Card);
+
+        using var app = new AppSession(new UiSettings(ws.Card, ws.Library, BackupEnabled: true, BackupPath: backup), ws.Root);
+        app.WaitReady();
+        Assert.Contains($"вторая копия — {backup}", app.AdvancedHeader); // visible with the section collapsed
+        app.ExpandAdvanced();
+        Assert.Contains("на том же диске, что и библиотека", app.Text("BackupWarning")); // same drive in this test
+        Assert.Contains(backup, app.Text("BackupExample"));
+
+        var dialog = app.RunImport();
+
+        Assert.Equal("Импорт завершён", dialog.Headline);
+        Assert.Empty(dialog.Failures);
+        Assert.Contains("Вторых копий: 16", dialog.Details);
+        var session = Assert.Single(Directory.GetDirectories(backup));
+        var copies = Snapshot.Take(session);
+        Assert.Equal(16, copies.Files.Count);
+        foreach (var (relative, hash) in copies.Files)
+            Assert.Equal(cardBefore.Files[relative], hash); // the card's folders and names, the same content
+        Invariants.NoTempFiles(backup);
+        Assert.Equal(
+            [@"other\IMG_0001.XMP", @"other\notes.txt", @"photos\sub\IMG_0001_copy.JPG"],
+            Snapshot.Take(ws.Card).Paths);
+
+        var log = Assert.Single(Directory.GetFiles(Path.Combine(ws.Root, "logs"), "import-*.log"));
+        Assert.Contains($"Вторая копия: {session} (папка на каждый импорт)", File.ReadAllLines(log));
+    }
+
+    [UiFact]
+    public void SecondCopyMirrorWithRenaming()
+    {
+        using var ws = new Workspace();
+        var mirror = Path.Combine(ws.Root, "mirror");
+        Directory.CreateDirectory(mirror);
+
+        using var app = new AppSession(new UiSettings(ws.Card, ws.Library, MoveMode: false, NameTemplate: "{YYYY}{MM}{DD}_{NAME}",
+            BackupEnabled: true, BackupPath: mirror, BackupMirror: true), ws.Root);
+        app.WaitReady();
+        var dialog = app.RunImport();
+
+        Assert.Empty(dialog.Failures);
+        var library = Snapshot.Take(ws.Library);
+        Assert.Equal(16, library.Files.Count);
+        Assert.Equal(library.Files, Snapshot.Take(mirror).Files); // the same folders, names and content
+        Assert.All(library.Paths, p => Assert.Matches(@"\\\d{8}_", p)); // every file renamed
+    }
+
+    [UiFact]
+    public void SecondCopyProblemsBlockTheImport()
+    {
+        using var ws = new Workspace();
+        var backup = Path.Combine(ws.Root, "backup");
+
+        // The backup disk is not plugged in yet.
+        using (var app = new AppSession(new UiSettings(ws.Card, ws.Library, BackupEnabled: true, BackupPath: backup), ws.Root))
+        {
+            app.WaitReady();
+            Assert.False(app.ImportEnabled);
+            Assert.Contains("Папка для второй копии не найдена", app.Notice ?? "");
+            Directory.CreateDirectory(backup); // plugged in: noticed without a click
+            app.WaitUntil(() => app.ImportEnabled, "import enabled once the backup folder exists");
+        }
+
+        // Turned on, but no folder chosen.
+        using (var app = new AppSession(new UiSettings(ws.Card, ws.Library, BackupEnabled: true), ws.Root))
+        {
+            app.WaitReady();
+            Assert.False(app.ImportEnabled);
+            Assert.Contains("Выберите папку для второй копии", app.Notice ?? "");
+            Assert.Contains("папка не выбрана", app.AdvancedHeader);
+            app.ExpandAdvanced();
+            AppSession.Toggle(app.Find("BackupEnabled")); // turned off again: nothing blocks
+            app.WaitUntil(() => app.ImportEnabled, "import enabled without a second copy");
+        }
+
+        // Inside the library or the card.
+        foreach (var inside in new[] { Path.Combine(ws.Library, "backup"), Path.Combine(ws.Card, "backup"), ws.Root })
+        {
+            Directory.CreateDirectory(inside);
+            using var app = new AppSession(new UiSettings(ws.Card, ws.Library, BackupEnabled: true, BackupPath: inside), ws.Root);
+            app.WaitUntil(() => app.Notice is { } n && n.Contains("Вторая копия не должна быть"), $"second copy in {inside} refused");
+            Assert.False(app.ImportEnabled);
+        }
+        Assert.Equal(Snapshot.Take(Fixtures.MediaRoot).Files, Snapshot.Take(ws.Card).Files); // nothing was imported or touched
+    }
+
     // ------------------------------------------------------------------ selection
 
     [UiFact]

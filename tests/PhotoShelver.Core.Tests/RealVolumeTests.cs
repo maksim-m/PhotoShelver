@@ -122,6 +122,83 @@ public class RealVolumeTests
         Invariants.NoTempFiles(library);
     }
 
+    [WritableVolumeFact]
+    public async Task SameDriveMoveWithTheSecondCopyOnTheVolume()
+    {
+        // Card and library on this computer's drive (the library copy is a rename), the second copy on another volume.
+        using var vol = new VolumeDir();
+        using var local = new TempDir();
+        var card = System.IO.Path.Combine(local.Path, "card");
+        var library = System.IO.Path.Combine(local.Path, "library");
+        var backupRoot = System.IO.Path.Combine(vol.Path, "backup");
+        Fixtures.CopyTo(card);
+        Directory.CreateDirectory(library);
+        Directory.CreateDirectory(backupRoot);
+        var cardBefore = Snapshot.Take(card);
+        var plan = new BackupPlan(backupRoot, BackupLayout.PerImport, card, ImportPlan.NewSessionFolder(backupRoot, DateTime.Now));
+
+        var outcome = await Pipeline.RunAsync(card, library, ImportMode.Move, backup: plan); // no test hooks
+
+        Assert.Empty(outcome.Result.Failures);
+        Assert.Equal(EndToEndTests.ExpectedTree, Snapshot.Take(library).Paths);
+        foreach (var imported in outcome.Result.Imported)
+        {
+            var relative = System.IO.Path.GetRelativePath(card, imported.SourcePath);
+            Assert.Equal(System.IO.Path.Combine(plan.SessionFolder!, relative), imported.BackupPath);
+            Assert.Equal(cardBefore.Files[relative], FileHasher.Hash(imported.BackupPath!));
+            Assert.Equal(cardBefore.Files[relative], FileHasher.Hash(imported.DestinationPath));
+            Assert.False(File.Exists(imported.SourcePath));
+        }
+        Invariants.NoTempFiles(backupRoot);
+    }
+
+    [WritableVolumeFact]
+    public async Task MoveFromTheVolumeWithAMirrorSecondCopy()
+    {
+        using var vol = new VolumeDir();
+        using var local = new TempDir();
+        var card = System.IO.Path.Combine(vol.Path, "card");
+        var library = System.IO.Path.Combine(local.Path, "library");
+        var mirror = System.IO.Path.Combine(local.Path, "mirror");
+        Fixtures.CopyTo(card);
+        Directory.CreateDirectory(library);
+        Directory.CreateDirectory(mirror);
+        var before = new[] { Snapshot.Take(card), Snapshot.Take(library) };
+
+        var outcome = await Pipeline.RunAsync(card, library, ImportMode.Move, backup: new BackupPlan(mirror, BackupLayout.Mirror, card));
+
+        Assert.Empty(outcome.Result.Failures);
+        Assert.Empty(outcome.Result.Warnings);
+        Assert.Equal(EndToEndTests.ExpectedTree, Snapshot.Take(library).Paths);
+        Assert.Equal(EndToEndTests.ExpectedTree, Snapshot.Take(mirror).Paths);
+        Assert.Equal(Snapshot.Take(library).Files, Snapshot.Take(mirror).Files);
+        Invariants.NothingLost(before, [Snapshot.Take(card), Snapshot.Take(library)]);
+        Invariants.NoTempFiles(mirror);
+    }
+
+    [ReadOnlyVolumeFact]
+    public async Task WriteProtectedCardWithASecondCopyKeepsEverySource()
+    {
+        var card = Path.Combine(ReadOnly!, "card");
+        Assert.True(PathUtil.IsReadOnlyVolume(card), $"SAFETY: {ReadOnly} is not a read-only volume - refusing to run a move from it");
+        var cardBefore = Snapshot.Take(card);
+        Assert.Equal(Snapshot.Take(Fixtures.MediaRoot).Files, cardBefore.Files);
+
+        using var local = new TempDir();
+        var library = Path.Combine(local.Path, "library");
+        var backupRoot = Path.Combine(local.Path, "backup");
+        Directory.CreateDirectory(library);
+        Directory.CreateDirectory(backupRoot);
+        var plan = new BackupPlan(backupRoot, BackupLayout.PerImport, card, ImportPlan.NewSessionFolder(backupRoot, DateTime.Now));
+
+        var outcome = await Pipeline.RunAsync(card, library, ImportMode.Move, backup: plan);
+
+        Assert.Equal(outcome.Jobs.Count, outcome.Result.Imported.Count);
+        Assert.All(outcome.Result.Imported, i => Assert.Equal(cardBefore.Files[Path.GetRelativePath(card, i.SourcePath)], FileHasher.Hash(i.BackupPath!)));
+        Assert.All(outcome.Result.Failures, f => Assert.Contains("не удалён", f.Message));
+        Assert.Equal(cardBefore.Files, Snapshot.Take(card).Files);
+    }
+
     [ReadOnlyVolumeFact]
     public async Task MoveFromWriteProtectedCardKeepsEverySource()
     {

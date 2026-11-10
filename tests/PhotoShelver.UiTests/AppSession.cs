@@ -40,7 +40,11 @@ public sealed record UiSettings(
     string Template = "{YYYY}/{YYYY}-{MM}-{DD}",
     bool MoveMode = true,
     bool IncludeSubfolders = true,
-    bool ShowFullTree = true);
+    bool ShowFullTree = true,
+    string NameTemplate = "{NAME}",
+    bool BackupEnabled = false,
+    string? BackupPath = null,
+    bool BackupMirror = false);
 
 public sealed record ImportDialog(string Headline, string Details, string? Warnings, IReadOnlyList<string> Failures, bool HasLogButton);
 
@@ -63,6 +67,10 @@ public sealed class AppSession : IDisposable
             settings.IncludeSubfolders,
             settings.MoveMode,
             settings.ShowFullTree,
+            settings.NameTemplate,
+            settings.BackupEnabled,
+            settings.BackupPath,
+            settings.BackupMirror,
             WindowWidth = 1280,
             WindowHeight = 900,
             WindowMaximized = false,
@@ -206,6 +214,12 @@ public sealed class AppSession : IDisposable
     public string AdvancedHeader => string.Join(" ", Find("Advanced")
         .FindAll(TreeScope.Descendants, new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Text))
         .Cast<AutomationElement>().Select(e => e.Current.Name).Take(1));
+
+    public void ExpandAdvanced()
+    {
+        ((ExpandCollapsePattern)Find("Advanced").GetCurrentPattern(ExpandCollapsePattern.Pattern)).Expand();
+        WaitUntil(() => TryFind("NameTemplate") is not null, "the Advanced section to open");
+    }
 
     public void CollapseAdvanced() =>
         ((ExpandCollapsePattern)Find("Advanced").GetCurrentPattern(ExpandCollapsePattern.Pattern)).Collapse();

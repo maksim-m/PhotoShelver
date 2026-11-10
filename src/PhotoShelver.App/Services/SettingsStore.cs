@@ -9,6 +9,10 @@ public sealed class AppSettings
     public string? TargetPath { get; set; }
     public string Template { get; set; } = FolderTemplate.Default;
     public string NameTemplate { get; set; } = FileNameTemplate.Default;
+    public bool BackupEnabled { get; set; }
+    public string? BackupPath { get; set; }
+    /// <summary>Second copy laid out like the library (true) or as a folder per import (false).</summary>
+    public bool BackupMirror { get; set; }
     public bool IncludeSubfolders { get; set; } = true;
     public bool MoveMode { get; set; } = true;
     public bool ShowFullTree { get; set; } = true;

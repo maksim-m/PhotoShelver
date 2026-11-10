@@ -36,6 +36,12 @@ public static class Ui
         "Tokens in braces: {NAME} — the original name ({NAME} alone keeps names as they are), {YYYY}, {YY}, {MM}, {MMM}, {DD} — date, {HH}, {mm}, {ss} — time of the shot. Text outside braces is kept as is; the extension is always kept",
         "Токены в фигурных скобках: {NAME} — исходное имя (один {NAME} — имена как есть), {YYYY}, {YY}, {MM}, {MMM}, {DD} — дата, {HH}, {mm}, {ss} — время съёмки. Текст вне скобок остаётся как есть; расширение всегда сохраняется");
     public static string NameTemplateLegend => L.T("{NAME} — original name · {YYYY} · {MM} · {DD} · {HH} · {mm} · {ss}", "{NAME} — исходное имя · {YYYY} · {MM} · {DD} · {HH} · {mm} · {ss}");
+    public static string SecondCopy => L.T("Second copy", "Вторая копия");
+    public static string BackupPerImport => L.T("A folder per import, original names (like Lightroom)", "Папка на каждый импорт, исходные имена (как в Lightroom)");
+    public static string BackupMirror => L.T("The same folders and names as in the library", "Те же папки и имена, что в библиотеке");
+    public static string BackupTip => L.T(
+        "Every imported file is also copied here and verified. When moving, the source is deleted only after both copies are verified",
+        "Каждый импортируемый файл копируется ещё и сюда и проверяется. При перемещении исходник удаляется только после проверки обеих копий");
     public static string ShowFullTree => L.T("Show the whole tree", "Показать всё дерево");
     public static string Show => L.T("Show", "Показать");
     public static string Delete => L.T("Delete", "Удалить");

@@ -100,7 +100,7 @@ internal static class Pipeline
         ImportResult Result);
 
     public static async Task<Outcome> RunAsync(string source, string target, ImportMode mode,
-        string template = "{YYYY}/{MM}-{DD}", Importer? importer = null, string? names = null)
+        string template = "{YYYY}/{MM}-{DD}", Importer? importer = null, string? names = null, BackupPlan? backup = null)
     {
         var tpl = FolderTemplate.Parse(template);
         var enumerated = SourceScanner.Enumerate(source, recursive: true);
@@ -109,7 +109,7 @@ internal static class Pipeline
         // Same job planning as the app.
         var jobs = ImportPlan.CreateJobs(
             enumerated.Files.Where(f => f.Error is null && f.Date is not null && duplicates[f].State == DuplicateState.New), target, tpl,
-            names is null ? null : FileNameTemplate.Parse(names));
+            names is null ? null : FileNameTemplate.Parse(names), backup);
         var result = (importer ?? new Importer()).Run(jobs, mode, null, default);
         return new Outcome(enumerated.Files, duplicates, jobs, result);
     }

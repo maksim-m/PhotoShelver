@@ -21,6 +21,7 @@ PhotoShelver does one job:
 - **Sorted by the real capture date.** EXIF for photos; for videos the camera's own clock (Canon), Apple's date with time zone, or the GPS position's time zone — so photos and videos from one moment land in the same folder. Files without metadata fall back to the modification date (and are marked).
 - **Duplicates are recognised by content.** Files that are already in the library (from an earlier import) or appear twice on the card are dimmed and not selected — detected by a 128-bit content hash, not by name.
 - **Your folder scheme.** `{YYYY}/{YYYY}-{MM}-{DD}` by default, or any template with `{YYYY}`, `{YY}`, `{MM}`, `{MMM}`, `{DD}` and `/` — text outside the braces is kept as is; mistakes are explained as you type, and an invalid template never lets the import start.
+- **Optional second copy.** Under *Advanced*: every imported file is also copied to another folder — a folder per import with the card's own names (like Lightroom), or a mirror of the library. When moving, the card is cleared only after *both* copies are verified.
 - **Optional renaming.** Under *Advanced*: a file name template such as `{YYYY}-{MM}-{DD}_{NAME}` → `2026-08-14_IMG_2041.JPG` (date, time `{HH}{mm}{ss}`, original name `{NAME}`). Off by default; when on, it stays visible even with the section collapsed.
 - **RAW-friendly.** Thumbnails for CR2, CR3, NEF, ARW, DNG, RAF, ORF, RW2 come from the preview the camera embedded — fast and without installing codecs. TIFF scans are shown upright.
 - **Fast on big cards.** Thousands of files are scanned in seconds; thumbnails load for what is on screen first.
@@ -33,7 +34,7 @@ Your photos are irreplaceable, so the importer is built around a few hard rules:
 
 - **Nothing is ever overwritten.** A name clash gets a suffix: `IMG_0001_1.JPG`, `IMG_0001_2.JPG`, …
 - **Every copy is verified before it counts.** The copy is read back from the disk bypassing the Windows cache and compared with the data that was read; the source is re-read from the card as well, which catches flaky card readers and cables.
-- **A source is deleted only after its copy is verified and committed to the disk** — a power cut or a crash can never leave you with neither file. Write-protected cards and files protected in the camera are never deleted.
+- **A source is deleted only after its copy (and the second copy, if on) is verified and committed to the disk** — a power cut or a crash can never leave you with neither file. Write-protected cards and files protected in the camera are never deleted.
 - **Files are copied under a temporary name** (`*.importing`) and get their real name only when complete, so an interrupted import never leaves a half-written photo looking like a real one.
 - **Every import is logged** — which file went where, with its hash — in `%LOCALAPPDATA%\PhotoShelver\logs`.
 

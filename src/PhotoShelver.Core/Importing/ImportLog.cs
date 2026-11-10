@@ -17,7 +17,13 @@ public sealed class ImportLog
 {
     private static readonly Encoding Utf8WithBom = new UTF8Encoding(encoderShouldEmitUTF8Identifier: true);
 
-    private ImportLog(string path) => Path = path;
+    private readonly ImportMode _mode;
+
+    private ImportLog(string path, ImportMode mode)
+    {
+        Path = path;
+        _mode = mode;
+    }
 
     public string Path { get; }
 
@@ -25,7 +31,7 @@ public sealed class ImportLog
     public string? Error { get; private set; }
 
     public static ImportLog Start(string directory, ImportMode mode, string source, string target, string template,
-        IReadOnlyCollection<ImportJob> jobs, string appVersion, DateTime? now = null, string? nameTemplate = null)
+        IReadOnlyCollection<ImportJob> jobs, string appVersion, DateTime? now = null, string? nameTemplate = null, BackupPlan? backup = null)
     {
         var started = now ?? DateTime.Now;
         string path;
@@ -36,12 +42,17 @@ public sealed class ImportLog
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
         {
-            var failed = new ImportLog(System.IO.Path.Combine(directory, "import.log"));
+            var failed = new ImportLog(System.IO.Path.Combine(directory, "import.log"), mode);
             failed.Error = ex.Message;
             return failed;
         }
 
-        var log = new ImportLog(path);
+        var log = new ImportLog(path, mode);
+        var backupLine = backup is null ? ""
+            : $"{L.T("Second copy:", "Вторая копия:")} " + (backup.Layout == BackupLayout.Mirror
+                ? backup.Root + L.T(" (the same folders and names as in the library)", " (те же папки и имена, что в библиотеке)")
+                : (backup.SessionFolder ?? backup.Root) + L.T(" (a folder per import)", " (папка на каждый импорт)"))
+              + Environment.NewLine;
         log.Append(
             $"PhotoShelver {appVersion} — {L.T("import log", "журнал импорта")}{Environment.NewLine}" +
             $"{L.T("Started: ", "Начало:  ")} {started:yyyy-MM-dd HH:mm:ss}{Environment.NewLine}" +
@@ -50,6 +61,7 @@ public sealed class ImportLog
             $"{L.T("Target:  ", "Цель:    ")} {target}{Environment.NewLine}" +
             $"{L.T("Template:", "Шаблон:  ")} {template}{Environment.NewLine}" +
             (nameTemplate is null ? "" : $"{L.T("Names:   ", "Имена:   ")} {nameTemplate}{Environment.NewLine}") +
+            backupLine +
             $"{L.T("Files:   ", "Файлов:  ")} {jobs.Count} ({Size(jobs.Sum(j => j.Size))}){Environment.NewLine}{Environment.NewLine}");
         return log;
     }
@@ -59,10 +71,14 @@ public sealed class ImportLog
         var source = outcome.Job.SourcePath;
         string line;
         if (outcome.Imported is { } imported && outcome.Problem is null)
-            line = $"[OK]       {source} → {imported.DestinationPath}  ({Size(outcome.Job.Size)}{HashText(imported)})";
-        else if (outcome.Imported is { } kept)
-            line = L.T($"[KEPT]     {source} → {kept.DestinationPath}  ({Size(outcome.Job.Size)}{HashText(kept)}) — source not deleted: {outcome.Problem}",
-                $"[ОСТАВЛЕН] {source} → {kept.DestinationPath}  ({Size(outcome.Job.Size)}{HashText(kept)}) — исходник не удалён: {outcome.Problem}");
+            line = $"[OK]       {source} → {imported.DestinationPath}  ({Size(outcome.Job.Size)}{HashText(imported)}){BackupText(imported)}";
+        else if (outcome.Imported is { } kept && _mode == ImportMode.Move)
+            line = L.T($"[KEPT]     {source} → {kept.DestinationPath}  ({Size(outcome.Job.Size)}{HashText(kept)}){BackupText(kept)} — source not deleted: {outcome.Problem}",
+                $"[ОСТАВЛЕН] {source} → {kept.DestinationPath}  ({Size(outcome.Job.Size)}{HashText(kept)}){BackupText(kept)} — исходник не удалён: {outcome.Problem}");
+        else if (outcome.Imported is { } partial)
+            // Copy mode: imported, but something else went wrong (e.g. the second copy).
+            line = L.T($"[PARTIAL]  {source} → {partial.DestinationPath}  ({Size(outcome.Job.Size)}{HashText(partial)}){BackupText(partial)} — {outcome.Problem}",
+                $"[ЧАСТИЧНО] {source} → {partial.DestinationPath}  ({Size(outcome.Job.Size)}{HashText(partial)}){BackupText(partial)} — {outcome.Problem}");
         else
             line = L.T($"[ERROR]    {source} — {outcome.Problem}", $"[ОШИБКА]   {source} — {outcome.Problem}");
         Append(line + Environment.NewLine);
@@ -75,7 +91,10 @@ public sealed class ImportLog
         sb.AppendLine();
         sb.AppendLine($"{L.T("Finished:", "Конец:   ")} {now ?? DateTime.Now:yyyy-MM-dd HH:mm:ss}");
         sb.Append($"{L.T("Result:  ", "Итог:    ")} {L.T("imported", "импортировано")} {result.Imported.Count}");
-        if (kept > 0) sb.Append(L.T($" (source kept for {kept})", $" (из них исходник оставлен: {kept})"));
+        if (kept > 0)
+            sb.Append(_mode == ImportMode.Move
+                ? L.T($" (source kept for {kept})", $" (из них исходник оставлен: {kept})")
+                : L.T($" (with a problem: {kept})", $" (из них с замечанием: {kept})"));
         sb.Append(L.T($", errors {result.Failures.Count - kept}", $", ошибок {result.Failures.Count - kept}"));
         sb.AppendLine(result.Cancelled ? L.T(", import cancelled — the remaining files were not touched", ", импорт отменён — оставшиеся файлы не тронуты") : "");
         foreach (var warning in result.Warnings) sb.AppendLine($"{L.T("Warning", "Предупреждение")}: {warning}");
@@ -107,6 +126,9 @@ public sealed class ImportLog
 
     private static string HashText(ImportedFile file) =>
         file.Hash is { } hash ? $", xxh128 {hash:x32}" : L.T(", moved by renaming on the same drive", ", перемещён переименованием на том же диске");
+
+    private static string BackupText(ImportedFile file) =>
+        file.BackupPath is { } backup ? L.T($" + second copy {backup}", $" + вторая копия {backup}") : "";
 
     private static string Size(long bytes) => bytes switch
     {

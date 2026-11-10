@@ -326,6 +326,29 @@
                             <TextBlock AutomationProperties.AutomationId="NameTemplateWarning" Text="{Binding NameTemplateWarning}" TextWrapping="Wrap"/>
                         </DockPanel>
                         <TextBlock Text="{x:Static local:Ui.NameTemplateLegend}" Style="{StaticResource Secondary}" FontSize="12" Margin="0,2,0,0"/>
+
+                        <CheckBox AutomationProperties.AutomationId="BackupEnabled" Content="{x:Static local:Ui.SecondCopy}" IsChecked="{Binding IsBackupEnabled}"
+                                  IsEnabled="{Binding IsIdle}" ToolTip="{x:Static local:Ui.BackupTip}" Margin="0,14,0,0" HorizontalAlignment="Left"/>
+                        <StackPanel Margin="28,6,0,0" Visibility="{Binding IsBackupEnabled, Converter={StaticResource BoolToVis}}" IsEnabled="{Binding IsIdle}">
+                            <DockPanel>
+                                <Button AutomationProperties.AutomationId="BrowseBackup" DockPanel.Dock="Right" Content="{x:Static local:Ui.Browse}" Margin="8,0,0,0" Padding="12,5"
+                                        Command="{Binding BrowseBackupCommand}"/>
+                                <TextBox AutomationProperties.AutomationId="BackupPath" Text="{Binding BackupPath, Mode=OneWay}" IsReadOnly="True" VerticalContentAlignment="Center"/>
+                            </DockPanel>
+                            <RadioButton AutomationProperties.AutomationId="BackupPerImport" GroupName="BackupLayout" IsChecked="{Binding IsBackupPerImport}" Margin="0,8,0,0">
+                                <TextBlock Text="{x:Static local:Ui.BackupPerImport}" TextWrapping="Wrap"/>
+                            </RadioButton>
+                            <RadioButton AutomationProperties.AutomationId="BackupMirror" GroupName="BackupLayout" IsChecked="{Binding IsBackupMirror}" Margin="0,2,0,0">
+                                <TextBlock Text="{x:Static local:Ui.BackupMirror}" TextWrapping="Wrap"/>
+                            </RadioButton>
+                            <TextBlock AutomationProperties.AutomationId="BackupExample" Text="{Binding BackupExample}" Style="{StaticResource Secondary}" Margin="0,4,0,0"
+                                       TextWrapping="Wrap" Visibility="{Binding BackupExample, Converter={StaticResource NotNullToVis}}"/>
+                            <DockPanel Margin="0,4,0,0" Visibility="{Binding BackupWarning, Converter={StaticResource NotNullToVis}}">
+                                <TextBlock DockPanel.Dock="Left" Text="&#xE7BA;" FontFamily="{StaticResource IconFont}" Margin="0,2,6,0"
+                                           Foreground="{DynamicResource SystemFillColorCautionBrush}"/>
+                                <TextBlock AutomationProperties.AutomationId="BackupWarning" Text="{Binding BackupWarning}" TextWrapping="Wrap"/>
+                            </DockPanel>
+                        </StackPanel>
                     </StackPanel>
                 </Expander>
 

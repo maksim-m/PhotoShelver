@@ -24,6 +24,8 @@ public partial class ImportSummaryWindow : Window
         Title = HeadlineText.Text;
 
         var details = L.T($"Imported: {Format.Files(result.Imported.Count)}.", $"Импортировано: {Format.Files(result.Imported.Count)}.");
+        var backups = result.Imported.Count(i => i.BackupPath is not null);
+        if (backups > 0) details += L.T($" Second copies: {backups}.", $" Вторых копий: {backups}.");
         if (result.Failures.Count > 0) details += L.T($" Errors: {result.Failures.Count}.", $" Ошибок: {result.Failures.Count}.");
         if (result.Cancelled) details += L.T(" The remaining files were not touched.", " Оставшиеся файлы не тронуты.");
         DetailsText.Text = details;
