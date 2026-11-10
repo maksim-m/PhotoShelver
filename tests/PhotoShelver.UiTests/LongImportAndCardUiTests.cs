@@ -145,4 +145,35 @@ public class LongImportAndCardUiTests
         Assert.Equal(cardBefore.Files, Snapshot.Take(card).Files);
         Assert.Equal(16, Snapshot.Take(library).Files.Count);
     }
+
+    [ReadOnlyCardUiFact]
+    [Trait("Category", "RealVolumeUi")]
+    public void WriteProtectedTargetOrSecondCopyBlocksTheImport()
+    {
+        var volume = Environment.GetEnvironmentVariable("PHOTOSHELVER_TEST_READONLY_VOLUME")!;
+        Assert.True(PathUtil.IsReadOnlyVolume(volume), $"SAFETY: {volume} is not a read-only volume - refusing to run");
+        var volumeBefore = Snapshot.Take(volume);
+
+        using var local = new TempDir();
+        var source = Path.Combine(local.Path, "card");
+        Fixtures.CopyTo(source);
+        var library = Path.Combine(local.Path, "lib");
+        Directory.CreateDirectory(library);
+
+        // The library on the write-protected drive.
+        using (var app = new AppSession(new UiSettings(source, volume), local.Path))
+        {
+            app.WaitUntil(() => (app.Notice ?? "").Contains("Папка-цель на носителе, защищённом от записи"), "read-only target notice");
+            Assert.False(app.ImportEnabled);
+        }
+
+        // The second copy on the write-protected drive.
+        using (var app = new AppSession(new UiSettings(source, library, BackupEnabled: true, BackupPath: volume), local.Path))
+        {
+            app.WaitUntil(() => (app.Notice ?? "").Contains("Папка для второй копии на носителе, защищённом от записи"), "read-only backup notice");
+            Assert.False(app.ImportEnabled);
+        }
+        Assert.Equal(volumeBefore.Files, Snapshot.Take(volume).Files);
+        Assert.Empty(Directory.EnumerateFileSystemEntries(library));
+    }
 }

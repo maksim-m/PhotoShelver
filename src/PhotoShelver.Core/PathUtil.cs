@@ -50,13 +50,85 @@ public static class PathUtil
         }
     }
 
-    /// <summary>True when the paths are the same folder or one contains the other.</summary>
+    /// <summary>
+    /// True when the paths are the same folder or one contains the other — also when one of them reaches the other
+    /// through another name (a subst drive, a junction, a symbolic link).
+    /// </summary>
     public static bool AreNestedOrEqual(string a, string b)
     {
-        var na = Normalize(a);
-        var nb = Normalize(b);
-        return na.StartsWith(nb, StringComparison.OrdinalIgnoreCase) || nb.StartsWith(na, StringComparison.OrdinalIgnoreCase);
+        static bool Nested(string x, string y) =>
+            x.StartsWith(y, StringComparison.OrdinalIgnoreCase) || y.StartsWith(x, StringComparison.OrdinalIgnoreCase);
+        return Nested(Normalize(a), Normalize(b)) || Nested(WithTrailingSeparator(CanonicalPath(a)), WithTrailingSeparator(CanonicalPath(b)));
     }
+
+    /// <summary>
+    /// The real location of a path: subst drives, junctions and symbolic links resolved (GetFinalPathNameByHandle on the
+    /// nearest existing folder or file, the rest appended). Falls back to the full path when it cannot be resolved.
+    /// </summary>
+    public static string CanonicalPath(string path)
+    {
+        var full = Path.GetFullPath(path);
+        var existing = full;
+        while (!Directory.Exists(existing) && !File.Exists(existing))
+        {
+            existing = Path.GetDirectoryName(existing);
+            if (existing is null) return full;
+        }
+        var final = FinalPath(existing);
+        if (final is null) return full;
+        var rest = Path.GetRelativePath(existing, full);
+        return rest == "." ? final : Path.Combine(final, rest);
+    }
+
+    /// <summary>True when both paths are the same file (also through another name or a hard link).</summary>
+    public static bool IsSameFile(string a, string b)
+    {
+        if (string.Equals(CanonicalPath(a), CanonicalPath(b), StringComparison.OrdinalIgnoreCase)) return true;
+        return FileId(a) is { } ida && FileId(b) is { } idb && ida == idb;
+    }
+
+    private const uint FileShareAll = 0x1 | 0x2 | 0x4;
+    private const uint OpenExisting = 3;
+    private const uint FileFlagBackupSemantics = 0x02000000; // needed to open a folder
+
+    private static string? FinalPath(string existing)
+    {
+        using var handle = CreateFileW(existing, 0, FileShareAll, IntPtr.Zero, OpenExisting, FileFlagBackupSemantics, IntPtr.Zero);
+        if (handle.IsInvalid) return null;
+        var buffer = new char[32768];
+        var length = GetFinalPathNameByHandleW(handle, buffer, (uint)buffer.Length, 0);
+        if (length == 0 || length >= buffer.Length) return null;
+        var result = new string(buffer, 0, (int)length);
+        if (result.StartsWith(@"\\?\UNC\", StringComparison.OrdinalIgnoreCase)) return @"\\" + result[8..];
+        if (result.StartsWith(@"\\?\", StringComparison.Ordinal)) return result[4..];
+        return result;
+    }
+
+    private static (uint Volume, uint High, uint Low)? FileId(string path)
+    {
+        using var handle = CreateFileW(path, 0, FileShareAll, IntPtr.Zero, OpenExisting, FileFlagBackupSemantics, IntPtr.Zero);
+        if (handle.IsInvalid || !GetFileInformationByHandle(handle, out var info)) return null;
+        return (info.VolumeSerialNumber, info.FileIndexHigh, info.FileIndexLow);
+    }
+
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    private struct ByHandleFileInformation
+    {
+        public uint FileAttributes;
+        public System.Runtime.InteropServices.ComTypes.FILETIME CreationTime, LastAccessTime, LastWriteTime;
+        public uint VolumeSerialNumber, FileSizeHigh, FileSizeLow, NumberOfLinks, FileIndexHigh, FileIndexLow;
+    }
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
+    private static extern Microsoft.Win32.SafeHandles.SafeFileHandle CreateFileW(string fileName, uint access, uint share, IntPtr security,
+        uint creation, uint flags, IntPtr template);
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
+    private static extern uint GetFinalPathNameByHandleW(Microsoft.Win32.SafeHandles.SafeFileHandle handle, [System.Runtime.InteropServices.Out] char[] path, uint length, uint flags);
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
+    [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+    private static extern bool GetFileInformationByHandle(Microsoft.Win32.SafeHandles.SafeFileHandle handle, out ByHandleFileInformation info);
 
     /// <summary>
     /// True when both paths are on the same volume (so a move is an atomic rename).

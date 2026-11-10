@@ -50,14 +50,23 @@ public static class SettingsStore
 
     public static void Save(AppSettings settings)
     {
+        // Written to a temp file and then put in place in one step: a crash or a power cut while saving must not
+        // leave a broken file (that would silently bring back the defaults, e.g. turn the second copy off).
+        var temp = FilePath + ".tmp";
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-            File.WriteAllText(FilePath, JsonSerializer.Serialize(settings, Options));
+            using (var stream = new FileStream(temp, FileMode.Create, FileAccess.Write, FileShare.None))
+            {
+                JsonSerializer.Serialize(stream, settings, Options);
+                stream.Flush(flushToDisk: true);
+            }
+            File.Move(temp, FilePath, overwrite: true);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            // Not critical.
+            // Not critical: the previous settings file stays as it was.
+            try { File.Delete(temp); } catch (Exception cleanup) when (cleanup is IOException or UnauthorizedAccessException) { }
         }
     }
 }

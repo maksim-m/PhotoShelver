@@ -206,6 +206,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             return L.T("Choose a folder for the second copy (Advanced)", "Выберите папку для второй копии (Дополнительно)");
         if (!Directory.Exists(BackupPath))
             return L.T("The folder for the second copy is not found", "Папка для второй копии не найдена");
+        if (PathUtil.IsReadOnlyVolume(BackupPath))
+            return L.T("The folder for the second copy is on a write-protected drive", "Папка для второй копии на носителе, защищённом от записи");
         if (!string.IsNullOrWhiteSpace(SourcePath) && PathUtil.AreNestedOrEqual(BackupPath, SourcePath))
             return L.T("The second copy must not be in the source folder (or contain it)", "Вторая копия не должна быть в папке-источнике (или содержать её)");
         if (!string.IsNullOrWhiteSpace(TargetPath) && PathUtil.AreNestedOrEqual(BackupPath, TargetPath))
@@ -503,11 +505,20 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         var template = _template!;
         var names = _nameTemplate!;
         var mode = IsMoveMode ? ImportMode.Move : ImportMode.Copy;
+        // Checked again at the click (the folders are otherwise checked every 2 s): never import without a second copy
+        // that was asked for.
+        if (BackupProblem() is { } backupProblem)
+        {
+            Notice = backupProblem;
+            return;
+        }
         BackupPlan? backup;
         List<ImportJob> jobs;
         try
         {
             backup = CurrentBackupPlan(DateTime.Now);
+            if (IsBackupEnabled && backup is null)
+                throw new InvalidOperationException(L.T("the second copy is on, but its folder is not set", "вторая копия включена, но папка не задана"));
             jobs = ImportPlan.CreateJobs(_items.Where(i => i.IsSelected && i.CanBeImported).Select(i => i.File), target, template, names, backup);
         }
         catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or IOException)
@@ -968,6 +979,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         BlockingReason =
             !string.IsNullOrWhiteSpace(SourcePath) && !Directory.Exists(SourcePath) ? L.T("Source folder not found", "Папка-источник не найдена") :
             !string.IsNullOrWhiteSpace(TargetPath) && !Directory.Exists(TargetPath) ? L.T("Target folder not found", "Папка-цель не найдена") :
+            !string.IsNullOrWhiteSpace(TargetPath) && PathUtil.IsReadOnlyVolume(TargetPath!) ? L.T("The target folder is on a write-protected drive", "Папка-цель на носителе, защищённом от записи") :
             IsNested() ? L.T("The source and the target must not be the same folder or inside one another", "Источник и цель не должны совпадать или находиться одна внутри другой") :
             BackupProblem();
 

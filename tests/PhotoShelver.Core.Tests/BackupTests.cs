@@ -314,6 +314,7 @@ public class BackupTests
     [Theory]
     [InlineData(ImportMode.Copy, false)]
     [InlineData(ImportMode.Move, true)]
+    [InlineData(ImportMode.Move, false)] // same drive: the library "copy" would be a rename that does not read the file
     public void ASourceThatChangesBetweenTheCopiesIsKept(ImportMode mode, bool otherVolume)
     {
         // The source is rewritten (same size, old modification time) after the second copy and before the library copy:

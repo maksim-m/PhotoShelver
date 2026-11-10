@@ -197,7 +197,10 @@ public sealed class Importer
         {
             Directory.CreateDirectory(job.DestinationFolder);
 
-            if (mode == ImportMode.Move && backupError is null && !TreatAsDifferentVolumes && PathUtil.IsSameVolume(job.SourcePath, job.DestinationFolder))
+            // A rename does not read the file: with a second copy, the source must still be exactly what was copied
+            // (re-read from the disk), otherwise it is copied instead and the copies are compared below.
+            if (mode == ImportMode.Move && backupError is null && !TreatAsDifferentVolumes && PathUtil.IsSameVolume(job.SourcePath, job.DestinationFolder)
+                && (backup is null || FileHasher.HashFromDisk(job.SourcePath, forceCached: ForceCachedVerification).Hash == backup.Hash))
             {
                 // The new second copy is committed to its disk before the source is renamed away.
                 if (backup is { IsNew: true })
@@ -305,6 +308,8 @@ public sealed class Importer
     {
         var candidates = new DirectoryInfo(folder).EnumerateFiles()
             .Where(f => f.Length == size && !ImportLeftovers.IsLeftover(f.Name))
+            // The source itself (reached through another name, e.g. a subst drive, or a hard link) is no second copy.
+            .Where(f => !PathUtil.IsSameFile(f.FullName, sourcePath))
             .ToList();
         if (candidates.Count == 0) return null;
         var sourceHash = FileHasher.HashFromDisk(sourcePath, forceCached: ForceCachedVerification).Hash;
@@ -362,7 +367,7 @@ public sealed class Importer
             UInt128 copiedHash = default;
             for (var attempt = 1; ; attempt++)
             {
-                temp = Path.Combine(folder, TempFileName?.Invoke(fileName) ?? $"{fileName}.{Random.Shared.Next():x8}.importing");
+                temp = Path.Combine(folder, TempFileName?.Invoke(fileName) ?? $"{TempBase(fileName)}.{Random.Shared.Next():x8}.importing");
                 try
                 {
                     copiedHash = CopyAndHash(sourcePath, temp, onBytes, () => ownsTemp = true);
@@ -443,6 +448,18 @@ public sealed class Importer
             throw;
         }
         return (copyHash, sourceRead.GetAwaiter().GetResult()); // GetResult rethrows the original exception
+    }
+
+    /// <summary>
+    /// The start of a temp file name: the final name, shortened so that "&lt;name&gt;.xxxxxxxx.importing" stays within
+    /// the 255-character limit of a file name (a long final name must not fail only because of its temp name).
+    /// </summary>
+    internal static string TempBase(string fileName)
+    {
+        const int max = 255 - 19; // ".xxxxxxxx.importing"
+        if (fileName.Length <= max) return fileName;
+        var cut = char.IsHighSurrogate(fileName[max - 1]) ? max - 1 : max;
+        return fileName[..cut].TrimEnd(' ', '.');
     }
 
     private static string VolumeLabel(string path) => Path.GetPathRoot(Path.GetFullPath(path)) ?? path;
