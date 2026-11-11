@@ -35,7 +35,40 @@ public sealed partial class CaptureDateReader
             DateSource.FileModified);
     }
 
-    private static CaptureDate? ReadPhoto(string path) => ExifDate(ImageMetadataReader.ReadMetadata(path));
+    /// <summary>Opens a TIFF for reading its metadata. Test hook: lets a test count the bytes read.</summary>
+    internal Func<string, Stream> OpenTiff { get; init; } =
+        path => new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, 4096);
+
+    private CaptureDate? ReadPhoto(string path)
+    {
+        if (EmbeddedPreview.IsTiff(path))
+        {
+            try
+            {
+                using var stream = OpenTiff(path);
+                return ExifDate(ReadTiff(stream));
+            }
+            catch (Exception ex) when (ex is not (OutOfMemoryException or StackOverflowException or AccessViolationException))
+            {
+                // Not a TIFF after all (e.g. a mislabelled JPEG) or damaged: the usual reading detects the format itself.
+            }
+        }
+        return ExifDate(ImageMetadataReader.ReadMetadata(path));
+    }
+
+    /// <summary>
+    /// EXIF of a TIFF, read by jumping to the directories. The usual reader (ImageMetadataReader) reads a TIFF
+    /// sequentially up to its metadata — the whole file when the metadata comes after the image, as many scanners and
+    /// editors write it (hundreds of MB, from a card at its speed). The result is the same directories.
+    /// </summary>
+    internal static List<MetadataExtractor.Directory> ReadTiff(Stream stream)
+    {
+        var directories = new List<MetadataExtractor.Directory>();
+        MetadataExtractor.Formats.Tiff.TiffReader.ProcessTiff(
+            new MetadataExtractor.IO.IndexedSeekingReader(stream, 0, isMotorolaByteOrder: false),
+            new ExifTiffHandler(directories, 0));
+        return directories;
+    }
 
     /// <summary>Capture date from EXIF: the camera's local clock, used as is.</summary>
     private static CaptureDate? ExifDate(IReadOnlyList<MetadataExtractor.Directory> directories)
