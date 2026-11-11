@@ -30,7 +30,10 @@ public static class SettingsStore
             : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PhotoShelver", "settings.json");
 
     /// <summary>Import logs live next to the settings file (in tests that is a temp folder).</summary>
-    public static string LogsDirectory => Path.Combine(Path.GetDirectoryName(FilePath)!, "logs");
+    public static string LogsDirectory => Path.Combine(DataDirectory, "logs");
+
+    /// <summary>The app's own folder (settings, logs, error log): in tests the temp folder of PHOTOSHELVER_SETTINGS.</summary>
+    public static string DataDirectory => Path.GetDirectoryName(FilePath)!;
 
     private static readonly JsonSerializerOptions Options = new() { WriteIndented = true };
 

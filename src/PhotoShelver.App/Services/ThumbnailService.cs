@@ -60,6 +60,27 @@ public sealed class ThumbnailService : IDisposable
         }
     }
 
+    /// <summary>
+    /// The thumbnail of a file, or null. Never throws: Windows calls into third-party thumbnail providers (codec packs)
+    /// here, which can fail in any way, and an exception escaping a worker thread would end the whole app —
+    /// possibly in the middle of an import.
+    /// </summary>
+    private static BitmapSource? Load(string path)
+    {
+        try
+        {
+            // RAW: the camera's embedded preview first (fast, needs no codec); otherwise Windows' thumbnail.
+            var image = (Core.Metadata.EmbeddedPreview.IsRaw(path) ? RawThumbnail.Get(path, PixelSize) : null)
+                        ?? ShellThumbnail.Get(path, PixelSize);
+            if (image is not null && Core.Metadata.EmbeddedPreview.IsTiff(path)) image = UprightTiff(path, image);
+            return image;
+        }
+        catch (Exception ex) when (ex is not StackOverflowException)
+        {
+            return null; // shown as "no thumbnail"
+        }
+    }
+
     private void Worker()
     {
         while (!_disposed)
@@ -68,11 +89,7 @@ public sealed class ThumbnailService : IDisposable
             if (_disposed) return;
             if (!_queue.TryPop(out var item) || !item.IsAlive) continue;
 
-            // RAW: the camera's embedded preview first (fast, needs no codec); otherwise Windows' thumbnail.
-            var path = item.File.Path;
-            var image = (Core.Metadata.EmbeddedPreview.IsRaw(path) ? RawThumbnail.Get(path, PixelSize) : null)
-                        ?? ShellThumbnail.Get(path, PixelSize);
-            if (image is not null && Core.Metadata.EmbeddedPreview.IsTiff(path)) image = UprightTiff(path, image);
+            var image = Load(item.File.Path);
             _ui.BeginInvoke(DispatcherPriority.Background, () =>
             {
                 if (!item.IsAlive) return;

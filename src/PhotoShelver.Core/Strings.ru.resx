@@ -608,4 +608,11 @@
   <data name="FileMany" xml:space="preserve">
     <value>файлов</value>
   </data>
+  <data name="TheAppCouldNotStart" xml:space="preserve">
+    <value>Не удалось запустить PhotoShelver.
+
+{0}
+
+Подробности: {1}</value>
+  </data>
 </root>

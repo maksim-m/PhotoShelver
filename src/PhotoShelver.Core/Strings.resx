@@ -608,4 +608,11 @@ Details: {1}</value>
   <data name="FileMany" xml:space="preserve">
     <value>files</value>
   </data>
+  <data name="TheAppCouldNotStart" xml:space="preserve">
+    <value>PhotoShelver could not start.
+
+{0}
+
+Details: {1}</value>
+  </data>
 </root>

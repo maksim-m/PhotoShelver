@@ -54,6 +54,22 @@ public class VideoMetadataTests
         Assert.Null(info.AppleCreationDate);
     }
 
+    [Theory]
+    [InlineData(ulong.MaxValue)]
+    [InlineData(0x8000_0000_0000_0000UL)]
+    [InlineData(400_000_000_000UL)] // past year 9999
+    public void AGarbageMvhdTimeDoesNotLoseTheOtherDates(ulong seconds)
+    {
+        // Version 1 mvhd with an impossible 64-bit time, followed by a valid Apple date.
+        var mvhd = Box("mvhd", [1, 0, 0, 0], [.. BitConverter.GetBytes(seconds).Reverse()], [.. BitConverter.GetBytes(seconds).Reverse()], new byte[100]);
+        var info = IsoBmffReader.Read(Mp4(mvhd, AppleMeta(("com.apple.quicktime.creationdate", "2025-08-02T07:15:00+0900"))));
+
+        Assert.Null(info.CreationUtc);
+        Assert.Equal("2025-08-02T07:15:00+0900", info.AppleCreationDate);
+        var date = new CaptureDateReader(Berlin).ResolveVideoDate(info);
+        Assert.Equal(new DateTime(2025, 8, 2, 7, 15, 0), date!.Value.Local);
+    }
+
     [Fact]
     public void ReadsAppleKeys()
     {

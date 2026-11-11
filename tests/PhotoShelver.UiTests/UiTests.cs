@@ -504,6 +504,27 @@ public class UiTests
     // ------------------------------------------------------------------ settings
 
     [UiFact]
+    public void DamagedOrHandEditedSettingsStillOpenTheWindow()
+    {
+        using var ws = new Workspace();
+        var cardBefore = Snapshot.Take(ws.Card);
+        foreach (var raw in new[]
+        {
+            "{ \"WindowWidth\": -5, \"WindowHeight\": 1e308, \"Template\": \"\", \"NameTemplate\": null }",
+            "{ \"WindowWidth\": 0, \"WindowHeight\": 0, \"Template\": \"{YYYY\", \"BackupEnabled\": true, \"BackupPath\": \"Z:\\\\no\\\\such\" }",
+            "{ \"SourcePath\": 42 }",          // wrong type: the whole file is ignored
+            "this is not json",
+            "",
+        })
+        {
+            using var app = new AppSession(new UiSettings(ws.Card, ws.Library), ws.Root, rawSettings: raw);
+            app.WaitUntil(() => app.TryFind("Import") is not null, $"window with settings «{raw}»");
+            Assert.False(app.ImportEnabled); // nothing chosen or something to fix: never an import by itself
+        }
+        Assert.Equal(cardBefore.Files, Snapshot.Take(ws.Card).Files);
+    }
+
+    [UiFact]
     public void SettingsAreSavedOnClose()
     {
         using var ws = new Workspace();

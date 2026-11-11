@@ -1,3 +1,4 @@
+using PhotoShelver.App.Services;
 using PhotoShelver.Core;
 using System.Windows;
 using System.Windows.Threading;
@@ -6,8 +7,8 @@ namespace PhotoShelver.App;
 
 public partial class App : Application
 {
-    private static readonly string LogPath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PhotoShelver", "errors.log");
+    /// <summary>Next to the settings file, so tests (PHOTOSHELVER_SETTINGS) never write into the user's folder.</summary>
+    private static string LogPath => Path.Combine(SettingsStore.DataDirectory, "errors.log");
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -21,10 +22,23 @@ public partial class App : Application
         base.OnStartup(e);
     }
 
+    private bool _exiting;
+
     private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
         Log(e.Exception);
         e.Handled = true;
+        if (_exiting) return; // a follow-up error while shutting down: logged, no second message
+        // Without a main window (it failed while opening) there is nothing to keep running: say so and exit,
+        // instead of leaving an invisible process behind.
+        if (MainWindow is not { IsLoaded: true })
+        {
+            _exiting = true;
+            MessageBox.Show(L.F(Strings.TheAppCouldNotStart, e.Exception.Message, LogPath),
+                "PhotoShelver", MessageBoxButton.OK, MessageBoxImage.Error);
+            Shutdown(1);
+            return;
+        }
         MessageBox.Show(
             L.F(Strings.AnUnexpectedInterfaceErrorOccurredTheApp, e.Exception.Message, LogPath),
             "PhotoShelver", MessageBoxButton.OK, MessageBoxImage.Warning);

@@ -56,10 +56,11 @@ public sealed class AppSession : IDisposable
     private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(30);
     private readonly Process _process;
 
-    public AppSession(UiSettings settings, string workDir, IReadOnlyDictionary<string, string>? environment = null)
+    /// <param name="rawSettings">The settings file's exact content instead of <paramref name="settings"/> (e.g. a damaged file).</param>
+    public AppSession(UiSettings settings, string workDir, IReadOnlyDictionary<string, string>? environment = null, string? rawSettings = null)
     {
         SettingsPath = Path.Combine(workDir, "settings.json");
-        File.WriteAllText(SettingsPath, JsonSerializer.Serialize(new
+        File.WriteAllText(SettingsPath, rawSettings ?? JsonSerializer.Serialize(new
         {
             settings.SourcePath,
             settings.TargetPath,
@@ -82,14 +83,32 @@ public sealed class AppSession : IDisposable
         start.Environment["PHOTOSHELVER_SETTINGS"] = SettingsPath; // SAFETY: the user's settings are never used
         _process = Process.Start(start) ?? throw new InvalidOperationException("could not start the app");
 
-        var deadline = DateTime.UtcNow + DefaultTimeout;
-        while (_process.MainWindowHandle == IntPtr.Zero)
+        try
         {
-            if (DateTime.UtcNow > deadline || _process.HasExited) throw new InvalidOperationException("the app window did not appear");
-            Thread.Sleep(100);
-            _process.Refresh();
+            var deadline = DateTime.UtcNow + DefaultTimeout;
+            while (_process.MainWindowHandle == IntPtr.Zero)
+            {
+                if (DateTime.UtcNow > deadline || _process.HasExited) throw new InvalidOperationException("the app window did not appear");
+                Thread.Sleep(100);
+                _process.Refresh();
+            }
+            Window = AutomationElement.FromHandle(_process.MainWindowHandle);
+            // A standard Windows message box (class #32770) instead of the main window: the app failed to start and
+            // waits for someone to press OK. Fail now with its text instead of waiting on it.
+            if (Window.Current.ClassName == "#32770")
+            {
+                var text = string.Join(" ", Window.FindAll(TreeScope.Descendants,
+                        new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Text))
+                    .Cast<AutomationElement>().Select(e => e.Current.Name));
+                throw new InvalidOperationException($"the app showed a message instead of its window: {text}");
+            }
         }
-        Window = AutomationElement.FromHandle(_process.MainWindowHandle);
+        catch
+        {
+            // The session never reaches its Dispose: never leave the app running behind the tests.
+            Dispose();
+            throw;
+        }
     }
 
     public string SettingsPath { get; }
@@ -169,10 +188,21 @@ public sealed class AppSession : IDisposable
     /// <summary>Clicks with the real mouse at a point of the element (fractions of its width/height).</summary>
     public void MouseClick(AutomationElement element, bool right = false, bool twice = false, double fx = 0.5, double fy = 0.5)
     {
-        Window.SetFocus(); // bring the window to the front so it receives the input
-        Thread.Sleep(200);
         var r = element.Current.BoundingRectangle;
-        SetCursorPos((int)(r.Left + r.Width * fx), (int)(r.Top + r.Height * fy));
+        var (x, y) = ((int)(r.Left + r.Width * fx), (int)(r.Top + r.Height * fy));
+        // A real click goes to whatever window is on top at that point. Windows does not let a background process take
+        // the foreground while someone uses the computer, so the app may open behind another window: bring it to the
+        // front, and never click anything that is not the app.
+        var covering = "";
+        WaitUntil(() =>
+        {
+            BringToFront();
+            var top = GetAncestor(WindowFromPoint(new POINT { X = x, Y = y }), 2 /* GA_ROOT */);
+            if (top == _process.MainWindowHandle) return true;
+            covering = DescribeWindow(top);
+            return false;
+        }, "the app window to be on top at the click point", TimeSpan.FromSeconds(10), () => $"covered by {covering}");
+        SetCursorPos(x, y);
         Thread.Sleep(100);
         var (down, up) = right ? (0x0008u, 0x0010u) : (0x0002u, 0x0004u);
         for (var i = 0; i < (twice ? 2 : 1); i++)
@@ -194,6 +224,42 @@ public sealed class AppSession : IDisposable
         Click(item!);
     }
 
+    /// <summary>
+    /// Foreground for the app's window. A short Alt press releases Windows' foreground lock (the documented way an
+    /// app that received input may hand the foreground over); then SetForegroundWindow is allowed.
+    /// </summary>
+    private void BringToFront()
+    {
+        var hwnd = _process.MainWindowHandle;
+        if (GetForegroundWindow() == hwnd) return;
+        keybd_event(0x12 /* VK_MENU */, 0, 0, IntPtr.Zero);
+        keybd_event(0x12, 0, 0x2 /* KEYEVENTF_KEYUP */, IntPtr.Zero);
+        ShowWindow(hwnd, 9 /* SW_RESTORE */);
+        SetForegroundWindow(hwnd);
+        Thread.Sleep(150);
+    }
+
+    private static string DescribeWindow(IntPtr hwnd)
+    {
+        var title = new System.Text.StringBuilder(256);
+        GetWindowText(hwnd, title, title.Capacity);
+        GetWindowThreadProcessId(hwnd, out var pid);
+        string process;
+        try { process = Process.GetProcessById((int)pid).ProcessName; } catch (ArgumentException) { process = "?"; }
+        return $"window “{title}” of process {process}";
+    }
+
+    [StructLayout(LayoutKind.Sequential)] private struct POINT { public int X, Y; }
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetWindowText(IntPtr hwnd, System.Text.StringBuilder text, int max);
+    [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint pid);
+
+    [DllImport("user32.dll")] private static extern IntPtr WindowFromPoint(POINT point);
+    [DllImport("user32.dll")] private static extern IntPtr GetAncestor(IntPtr hwnd, uint flags);
+    [DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] private static extern bool SetForegroundWindow(IntPtr hwnd);
+    [DllImport("user32.dll")] private static extern bool ShowWindow(IntPtr hwnd, int command);
+    [DllImport("user32.dll")] private static extern void keybd_event(byte key, byte scan, uint flags, IntPtr extra);
     [DllImport("user32.dll")] private static extern bool SetCursorPos(int x, int y);
     [DllImport("user32.dll")] private static extern void mouse_event(uint flags, int dx, int dy, uint data, IntPtr extra);
     [DllImport("user32.dll")] private static extern bool SetProcessDpiAwarenessContext(IntPtr value);
@@ -294,6 +360,18 @@ public sealed class AppSession : IDisposable
     }
 
     // ---------------- waiting & diagnostics ----------------
+
+    public void WaitUntil(Func<bool> condition, string what, TimeSpan? timeout, Func<string> detail)
+    {
+        try
+        {
+            WaitUntil(condition, what, timeout);
+        }
+        catch (TimeoutException ex)
+        {
+            throw new TimeoutException($"{ex.Message} ({detail()})", ex);
+        }
+    }
 
     public void WaitUntil(Func<bool> condition, string what, TimeSpan? timeout = null)
     {

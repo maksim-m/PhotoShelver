@@ -12,7 +12,9 @@ Exit code: 0 if every mutation was caught, 1 otherwise.
 When code changes so that a snippet below no longer exists, the script stops with an error -
 update the snippet together with the code. Snippets use "\n" line endings; files may use CRLF.
 """
+import base64
 import io
+import json
 import os
 import re
 import shutil
@@ -190,6 +192,9 @@ MUTATIONS = [
     ("hard link not recognised as the same file", os.path.join("src", "PhotoShelver.Core", "PathUtil.cs"),
      "return FileId(a) is { } ida && FileId(b) is { } idb && ida == idb;",
      "return false;"),
+    ("an impossible MP4 creation time loses the file's other dates", os.path.join("src", "PhotoShelver.Core", "Metadata", "IsoBmffReader.cs"),
+     "if (seconds == 0 || seconds > (ulong)(DateTime.MaxValue - Epoch1904).TotalSeconds) return null;",
+     "if (seconds == 0) return null;"),
     ("metadata errors not caught", CDR,
      "catch (Exception ex) when (ex is not (OutOfMemoryException or StackOverflowException or AccessViolationException))\n        {\n            // Malformed",
      "catch (IOException)\n        {\n            // Malformed"),
@@ -242,6 +247,9 @@ UI_MUTATIONS = [
     ("second copy not made by the import", VM,
      ".Select(i => i.File), target, template, names, backup);",
      ".Select(i => i.File), target, template, names, null);"),
+    ("window size from the settings file not checked", os.path.join("src", "PhotoShelver.App", "MainWindow.xaml.cs"),
+     "Width = SaneSize(_settings.WindowWidth, MinWidth, 1280);",
+     "Width = _settings.WindowWidth;"),
     ("nested source/target not blocked", VM,
      'IsNested() ? Strings.TheSourceAndTheTargetMustNot :',
      ""),
@@ -278,16 +286,35 @@ def run_tests(dotnet, ui=False):
                                capture_output=True, text=True, encoding="utf-8", errors="replace")
         if build.returncode != 0:
             return None
-        args = [dotnet, "test", UI_TESTS, "--no-build", "-nologo", "-v", "q"]
+        args = [dotnet, "test", UI_TESTS, "--no-build", "-nologo", "-v", "q", "--blame-hang-timeout", "5m"]
     else:
         args = [dotnet, "test", TESTS, "-nologo", "-v", "q"]
     proc = subprocess.run(args, cwd=REPO, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace")
     out = proc.stdout + proc.stderr
     m = re.search(r"Failed:\s+(\d+), Passed:\s+(\d+)", out)
-    return (int(m.group(1)), int(m.group(2))) if m else None
+    if not m:
+        return None
+    # A run stopped by --blame-hang-timeout (a test hung) reports only part of the tests and fails as a whole.
+    aborted = proc.returncode != 0 and int(m.group(1)) == 0
+    return int(m.group(1)), int(m.group(2)), aborted
+
+
+MARKER = os.path.join(REPO, "tools", ".mutation-in-progress.json")
+
+
+def restore_interrupted_run():
+    """A previous run was stopped while a mutation was applied (closed window, killed process): undo it first."""
+    if not os.path.exists(MARKER):
+        return
+    with open(MARKER, encoding="utf-8") as f:
+        saved = json.load(f)
+    write_raw(os.path.join(REPO, saved["path"]), base64.b64decode(saved["original"]).decode("utf-8"))
+    os.remove(MARKER)
+    print(f"restored {saved['path']} from an interrupted run", flush=True)
 
 
 def main():
+    restore_interrupted_run()
     dotnet = find_dotnet()
     ui = "--ui" in sys.argv
     mutations = UI_MUTATIONS if ui else MUTATIONS
@@ -301,7 +328,7 @@ def main():
         if text.count(old) != 1:
             sys.exit(f"Snippet for '{name}' found {text.count(old)}x in {rel} (expected exactly 1) - update this script")
     baseline = run()
-    if baseline is None or baseline[0] != 0:
+    if baseline is None or baseline[0] != 0 or baseline[2]:
         sys.exit(f"Baseline test run is not green ({baseline}); fix the tests first")
     print(f"baseline: {baseline[1]} tests passed", flush=True)
 
@@ -313,14 +340,19 @@ def main():
         mutated = original.replace(CRLF, LF).replace(old, new, 1)
         if uses_crlf:
             mutated = mutated.replace(LF, CRLF)
+        with open(MARKER, "w", encoding="utf-8") as f:
+            json.dump({"path": rel, "original": base64.b64encode(original.encode("utf-8")).decode("ascii")}, f)
         try:
             write_raw(path, mutated)
             result = run()
         finally:
             write_raw(path, original)  # always restore, byte for byte
+            os.remove(MARKER)
 
         if result is None:
             status, caught = "build failed", True
+        elif result[2]:
+            status, caught = f"test run aborted (a test hung) after {result[1]} passed", True
         else:
             status, caught = f"{result[0]} failed / {result[1]} passed", result[0] > 0
         if not caught:

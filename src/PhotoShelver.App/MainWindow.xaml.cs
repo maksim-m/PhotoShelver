@@ -20,8 +20,9 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         _settings = SettingsStore.Load();
-        Width = _settings.WindowWidth;
-        Height = _settings.WindowHeight;
+        // A hand-edited or damaged settings file must not stop the window from opening (WPF throws on NaN or negative sizes).
+        Width = SaneSize(_settings.WindowWidth, MinWidth, 1280);
+        Height = SaneSize(_settings.WindowHeight, MinHeight, 820);
         if (_settings.WindowMaximized) WindowState = WindowState.Maximized;
 
         _vm = new MainViewModel(Dispatcher, _settings);
@@ -32,6 +33,9 @@ public partial class MainWindow : Window
         DataContext = _vm;
         Loaded += (_, _) => _vm.Initialize();
     }
+
+    internal static double SaneSize(double saved, double min, double fallback) =>
+        double.IsFinite(saved) && saved >= min && saved <= 20_000 ? saved : fallback;
 
     private void ThumbGrid_SizeChanged(object sender, SizeChangedEventArgs e)
     {
@@ -79,6 +83,12 @@ public partial class MainWindow : Window
 
     protected override void OnClosing(CancelEventArgs e)
     {
+        // A window that failed while opening (the app is exiting): nothing was loaded, nothing to save.
+        if (_vm is null)
+        {
+            base.OnClosing(e);
+            return;
+        }
         if (_vm.IsImporting)
         {
             e.Cancel = true;

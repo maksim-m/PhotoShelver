@@ -169,7 +169,8 @@ internal static class IsoBmffReader
         ulong seconds = b[0] == 1
             ? BinaryPrimitives.ReadUInt64BigEndian(b.AsSpan(4))
             : BinaryPrimitives.ReadUInt32BigEndian(b.AsSpan(4));
-        if (seconds == 0) return null;
+        // 0 = unset; anything past year 9999 is garbage (and would throw, losing the file's other dates too).
+        if (seconds == 0 || seconds > (ulong)(DateTime.MaxValue - Epoch1904).TotalSeconds) return null;
         var result = Epoch1904.AddSeconds(seconds);
         // Sanity: reject obviously wrong values (unset clocks etc).
         if (result.Year < 1980 || result > DateTime.UtcNow.AddYears(1)) return null;

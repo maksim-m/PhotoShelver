@@ -8,3 +8,6 @@ TestResults/
 
 # Private real photos for local checks only - never commit
 *-raw-files*/
+
+# Left only while tools/mutation_check.py runs (or after it was interrupted; the next run restores from it)
+tools/.mutation-in-progress.json

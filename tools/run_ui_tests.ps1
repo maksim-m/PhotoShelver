@@ -17,5 +17,5 @@ if (-not $Dotnet) { $Dotnet = "C:\Program Files\dotnet\dotnet.exe" }
 if ($LASTEXITCODE -ne 0) { throw "build failed" }
 
 $env:PHOTOSHELVER_UI_TESTS = "1"
-& $Dotnet test (Join-Path $Repo "tests\PhotoShelver.UiTests") --no-build -nologo --logger "console;verbosity=normal"
+& $Dotnet test (Join-Path $Repo "tests\PhotoShelver.UiTests") --no-build -nologo --blame-hang-timeout 5m --logger "console;verbosity=normal"
 exit $LASTEXITCODE
