@@ -59,7 +59,18 @@ public sealed class AppSession : IDisposable
     /// <param name="rawSettings">The settings file's exact content instead of <paramref name="settings"/> (e.g. a damaged file).</param>
     public AppSession(UiSettings settings, string workDir, IReadOnlyDictionary<string, string>? environment = null, string? rawSettings = null)
     {
+        // SAFETY: the real app is started here, and it moves and deletes files. Every folder it is given must be a
+        // test folder (or one of the test volumes), so that no mistake in a test can point it at real photos.
+        RequireTestPath(workDir, "work folder");
         SettingsPath = Path.Combine(workDir, "settings.json");
+        RequireTestPath(SettingsPath, "settings file");
+        foreach (var (name, path) in new[] { ("source", settings.SourcePath), ("target", settings.TargetPath), ("second copy", settings.BackupPath) })
+            if (!string.IsNullOrEmpty(path)) RequireTestPath(path, name);
+        if (rawSettings is not null)
+            foreach (var path in PathsIn(rawSettings)) RequireTestPath(path, "path in the settings file");
+        foreach (var (key, value) in environment ?? new Dictionary<string, string>())
+            if (key.EndsWith("_LOG", StringComparison.Ordinal) || key.EndsWith("_SETTINGS", StringComparison.Ordinal)) RequireTestPath(value, key);
+
         File.WriteAllText(SettingsPath, rawSettings ?? JsonSerializer.Serialize(new
         {
             settings.SourcePath,
@@ -108,6 +119,47 @@ public sealed class AppSession : IDisposable
             // The session never reaches its Dispose: never leave the app running behind the tests.
             Dispose();
             throw;
+        }
+    }
+
+    /// <summary>
+    /// Refuses (throws before the app starts) any path outside %TEMP%\PhotoShelverTests, except the test volumes the
+    /// volume test script sets up (PHOTOSHELVER_TEST_VOLUME, and PHOTOSHELVER_TEST_READONLY_VOLUME only while it really
+    /// is write-protected).
+    /// </summary>
+    internal static void RequireTestPath(string path, string what)
+    {
+        if (PhotoShelver.Core.Tests.TempDir.IsTestPath(path)) return;
+        var writable = Environment.GetEnvironmentVariable("PHOTOSHELVER_TEST_VOLUME");
+        if (!string.IsNullOrEmpty(writable) && IsOn(path, writable)) return;
+        var readOnly = Environment.GetEnvironmentVariable("PHOTOSHELVER_TEST_READONLY_VOLUME");
+        if (!string.IsNullOrEmpty(readOnly) && IsOn(path, readOnly) && PhotoShelver.Core.PathUtil.IsReadOnlyVolume(readOnly)) return;
+        throw new InvalidOperationException($"SAFETY: the {what} “{path}” is not a test folder — refusing to start the app");
+    }
+
+    private static bool IsOn(string path, string volumeRoot) =>
+        Path.GetFullPath(path).StartsWith(Path.GetFullPath(volumeRoot), StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Every string value of a property named "...Path" in a settings file (a damaged file has none).</summary>
+    private static IEnumerable<string> PathsIn(string json)
+    {
+        JsonDocument document;
+        try
+        {
+            document = JsonDocument.Parse(json);
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
+        using (document)
+        {
+            if (document.RootElement.ValueKind != JsonValueKind.Object) return [];
+            return document.RootElement.EnumerateObject()
+                .Where(p => p.Name.EndsWith("Path", StringComparison.Ordinal) && p.Value.ValueKind == JsonValueKind.String)
+                .Select(p => p.Value.GetString()!)
+                .Where(p => p.Length > 0)
+                .ToList();
         }
     }
 

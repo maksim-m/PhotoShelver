@@ -539,6 +539,23 @@ public class UiTests
     }
 
     [UiFact]
+    public void TheAppIsNeverStartedOnFoldersOutsideTheTest()
+    {
+        using var ws = new Workspace();
+        var pictures = Environment.GetFolderPath(Environment.SpecialFolder.MyPictures); // stands for any real folder
+        var before = System.Diagnostics.Process.GetProcessesByName("PhotoShelver").Length;
+
+        Assert.Throws<InvalidOperationException>(() => new AppSession(new UiSettings(ws.Card, pictures), ws.Root));
+        Assert.Throws<InvalidOperationException>(() => new AppSession(new UiSettings(pictures, ws.Library), ws.Root));
+        Assert.Throws<InvalidOperationException>(() => new AppSession(new UiSettings(ws.Card, ws.Library, BackupEnabled: true, BackupPath: pictures), ws.Root));
+        Assert.Throws<InvalidOperationException>(() => new AppSession(new UiSettings(ws.Card, ws.Library), ws.Root,
+            rawSettings: "{ \"TargetPath\": " + System.Text.Json.JsonSerializer.Serialize(pictures) + " }"));
+        Assert.Throws<InvalidOperationException>(() => new AppSession(new UiSettings(ws.Card, ws.Library), pictures));
+
+        Assert.Equal(before, System.Diagnostics.Process.GetProcessesByName("PhotoShelver").Length); // never started
+    }
+
+    [UiFact]
     public void DamagedOrHandEditedSettingsStillOpenTheWindow()
     {
         using var ws = new Workspace();
@@ -546,7 +563,8 @@ public class UiTests
         foreach (var raw in new[]
         {
             "{ \"WindowWidth\": -5, \"WindowHeight\": 1e308, \"Template\": \"\", \"NameTemplate\": null }",
-            "{ \"WindowWidth\": 0, \"WindowHeight\": 0, \"Template\": \"{YYYY\", \"BackupEnabled\": true, \"BackupPath\": \"Z:\\\\no\\\\such\" }",
+            "{ \"WindowWidth\": 0, \"WindowHeight\": 0, \"Template\": \"{YYYY\", \"BackupEnabled\": true, \"BackupPath\": "
+                + JsonSerializer.Serialize(Path.Combine(ws.Root, "no", "such")) + " }", // a second-copy folder that does not exist
             "{ \"SourcePath\": 42 }",          // wrong type: the whole file is ignored
             "this is not json",
             "",
