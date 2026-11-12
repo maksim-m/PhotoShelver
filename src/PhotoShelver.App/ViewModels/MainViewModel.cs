@@ -279,6 +279,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         var now = (Directory.Exists(SourcePath), Directory.Exists(TargetPath), Directory.Exists(BackupPath));
         if (now == _foldersExist) return;
         _foldersExist = now;
+        ForgetExistingFolders();
         UpdateState();
         ScheduleRefresh();
     }
@@ -593,6 +594,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             _importCts = null;
         }
 
+        ForgetExistingFolders(); // the import has created folders
         ImportFinished?.Invoke(new ImportFinishedInfo(result, target, log.Error is null ? log.Path : null, log.Error));
         _ = FindLeftoversAsync();
         StartScan();
@@ -900,17 +902,29 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         if (Tree.Count == 0 && (destinations.Count > 0 || full)) TreePlaceholder = Strings.BuildingTheFolderTree;
         try
         {
-            var nodes = await Task.Run(() => FolderTree.Build(target, destinations, full, template.Depth, cts.Token), cts.Token);
+            // The target's existing folders do not change when files are ticked: listed once and kept for a few
+            // seconds (a big library on a hard disk or a network share takes long to list).
+            var depth = template.Depth;
+            var listingKey = $"{PathUtil.WithoutTrailingSeparator(target)}|{depth}";
+            var cached = full && _existingFolders is { } listing && listing.Key == listingKey && listing.Age.Elapsed < ExistingFoldersMaxAge
+                ? listing.Folders : null;
+            var (nodes, existing) = await Task.Run(() =>
+            {
+                var folders = !full ? null : cached ?? FolderTree.ListExisting(target, depth, cts.Token);
+                return (FolderTree.Build(target, destinations, full, depth, cts.Token, folders), folders);
+            }, cts.Token);
             if (cts != _treeCts) return;
-            var roots = nodes.Select(n => new FolderNodeViewModel(n, null, _treeExpansion, (path, expanded) => _treeExpansion[path] = expanded)).ToList();
+            if (existing is not null && !ReferenceEquals(existing, cached))
+                _existingFolders = (listingKey, existing, Stopwatch.StartNew());
+
+            // Updated in place: ticking files changes counts and labels, not the whole TreeView.
+            FolderNodeViewModel.Sync(Tree, nodes, null, _treeExpansion, (path, expanded) => _treeExpansion[path] = expanded);
+            var roots = Tree;
 
             // Nothing will be added: open the most recent top-level folder so the current structure is visible.
             var firstAddition = FirstAddition(roots);
             if (firstAddition is null && roots.Count > 0 && !_treeExpansion.ContainsKey(roots[^1].FullPath))
                 roots[^1].SetDefaultExpanded(true);
-
-            Tree.Clear();
-            foreach (var root in roots) Tree.Add(root);
 
             // Scroll only when the first destination folder changes, so ticking files does not make the tree jump.
             var scrollKey = firstAddition?.FullPath ?? "";
@@ -945,6 +959,14 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     /// First folder (in display order) that receives files: follow nodes with additions down to the
     /// actual destination folder, stopping at a node the user collapsed.
     /// </summary>
+    /// <summary>The target's existing folders as last listed (path|depth, folders, age); see <see cref="RefreshTreeAsync"/>.</summary>
+    private (string Key, IReadOnlyList<string> Folders, Stopwatch Age)? _existingFolders;
+
+    private static readonly TimeSpan ExistingFoldersMaxAge = TimeSpan.FromSeconds(10);
+
+    /// <summary>Forget the listing of the target's folders (after an import, or when folders appear or disappear).</summary>
+    private void ForgetExistingFolders() => _existingFolders = null;
+
     private static FolderNodeViewModel? FirstAddition(IEnumerable<FolderNodeViewModel> roots)
     {
         var node = roots.FirstOrDefault(n => n.HasCount);
@@ -955,6 +977,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     private void ResetTreeView()
     {
+        ForgetExistingFolders();
         _treeExpansion.Clear();
         _treeScrollKey = null;
     }

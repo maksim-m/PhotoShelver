@@ -109,6 +109,54 @@ public class DuplicateAndTreeTests
     }
 
     [Fact]
+    public void ListsExistingFoldersToTheTemplateDepthWithoutHiddenOnes()
+    {
+        using var dir = new TempDir();
+        dir.Sub("2025", "2025-12-31", "too-deep");
+        dir.Sub("2026", "2026-01-02");
+        var hidden = dir.Sub("2026", ".hidden");
+        File.SetAttributes(hidden, FileAttributes.Directory | FileAttributes.Hidden);
+
+        var folders = FolderTree.ListExisting(dir.Path, 2);
+
+        Assert.Equal([@"2025", @"2025\2025-12-31", @"2026", @"2026\2026-01-02"], folders.Order(StringComparer.OrdinalIgnoreCase));
+        Assert.True(folders.IndexOf("2026") < folders.IndexOf(@"2026\2026-01-02")); // parents first
+        Assert.Equal(["2025", "2026"], FolderTree.ListExisting(dir.Path, 1).Order());
+        Assert.Empty(FolderTree.ListExisting(Path.Combine(dir.Path, "missing"), 2));
+    }
+
+    [Fact]
+    public void ATreeFromAKeptListingIsTheSameAsFromTheDisk()
+    {
+        using var dir = new TempDir();
+        dir.Sub("2025", "2025-12-31");
+        dir.Sub("2026", "2026-01-02");
+        string[] destinations = [@"2026\2026-01-02", @"2026\2026-08-14", @"2026\2026-08-14", @"2027\2027-01-01"];
+
+        var fromDisk = FolderTree.Build(dir.Path, destinations, includeExisting: true, existingDepth: 2);
+        var fromListing = FolderTree.Build(dir.Path, destinations, includeExisting: true, existingDepth: 2,
+            existing: FolderTree.ListExisting(dir.Path, 2));
+
+        static IEnumerable<string> Flatten(IEnumerable<FolderNode> nodes) =>
+            nodes.SelectMany(n => Flatten(n.Children).Prepend($"{n.FullPath}|{n.Count}|{n.IsNew}"));
+        Assert.Equal(Flatten(fromDisk), Flatten(fromListing));
+    }
+
+    [Fact]
+    public void NewDestinationsAreCheckedOnTheDiskEvenWithAnOldListing()
+    {
+        using var dir = new TempDir();
+        var listing = FolderTree.ListExisting(dir.Path, 2); // empty: taken before the folder existed
+        dir.Sub("2026", "2026-08-14");
+
+        var nodes = FolderTree.Build(dir.Path, [@"2026\2026-08-14"], includeExisting: true, existingDepth: 2, existing: listing);
+
+        var day = Assert.Single(Assert.Single(nodes).Children);
+        Assert.False(day.IsNew); // exists now, although the listing did not have it
+        Assert.False(nodes[0].IsNew);
+    }
+
+    [Fact]
     public void Nesting()
     {
         Assert.True(PathUtil.AreNestedOrEqual(@"C:\Photos", @"C:\Photos\"));

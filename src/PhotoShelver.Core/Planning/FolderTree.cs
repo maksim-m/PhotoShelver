@@ -19,12 +19,18 @@ public static class FolderTree
     /// </summary>
     /// <param name="relativeDestinations">Relative destination folder for every file that will be imported (one entry per file).</param>
     /// <param name="includeExisting">Also include existing target folders that receive no files (up to <paramref name="existingDepth"/> levels).</param>
+    /// <param name="existing">
+    /// The target's existing folders as listed by <see cref="ListExisting"/> (a caller may keep the listing for a few
+    /// seconds instead of reading the disk on every change); null reads them now. Whether a destination folder is
+    /// new is always checked on the disk.
+    /// </param>
     public static List<FolderNode> Build(
         string targetRoot,
         IEnumerable<string> relativeDestinations,
         bool includeExisting,
         int existingDepth,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        IReadOnlyList<string>? existing = null)
     {
         var root = new FolderNode { Name = "", FullPath = targetRoot };
         var existsCache = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
@@ -56,19 +62,38 @@ public static class FolderTree
             }
         }
 
-        if (includeExisting && existingDepth > 0 && Directory.Exists(targetRoot))
-            AddExisting(root, existingDepth, GetOrAdd, ct);
+        if (includeExisting && existingDepth > 0)
+        {
+            foreach (var relative in existing ?? ListExisting(targetRoot, existingDepth, ct))
+            {
+                ct.ThrowIfCancellationRequested();
+                var node = root;
+                foreach (var segment in relative.Split('\\'))
+                    node = GetOrAdd(node, segment, true);
+            }
+        }
 
         Sort(root);
         return root.Children;
     }
 
-    private static void AddExisting(FolderNode node, int depthLeft, Func<FolderNode, string, bool?, FolderNode> getOrAdd, CancellationToken ct)
+    /// <summary>
+    /// Existing folders of the target up to <paramref name="depth"/> levels, as relative paths ("2025", "2025\2025-08-14"),
+    /// parents before their children. Hidden, system and inaccessible folders are left out. Empty when the target is missing.
+    /// </summary>
+    public static List<string> ListExisting(string targetRoot, int depth, CancellationToken ct = default)
     {
-        IEnumerable<DirectoryInfo> dirs;
+        var result = new List<string>();
+        if (depth > 0 && Directory.Exists(targetRoot)) AddExisting(targetRoot, "", depth, result, ct);
+        return result;
+    }
+
+    private static void AddExisting(string folder, string relative, int depthLeft, List<string> result, CancellationToken ct)
+    {
+        List<DirectoryInfo> dirs;
         try
         {
-            dirs = new DirectoryInfo(node.FullPath)
+            dirs = new DirectoryInfo(folder)
                 .EnumerateDirectories("*", new EnumerationOptions { IgnoreInaccessible = true, AttributesToSkip = FileAttributes.Hidden | FileAttributes.System })
                 .ToList();
         }
@@ -80,8 +105,9 @@ public static class FolderTree
         foreach (var dir in dirs)
         {
             ct.ThrowIfCancellationRequested();
-            var child = getOrAdd(node, dir.Name, true);
-            if (depthLeft > 1) AddExisting(child, depthLeft - 1, getOrAdd, ct);
+            var path = relative.Length == 0 ? dir.Name : relative + "\\" + dir.Name;
+            result.Add(path);
+            if (depthLeft > 1) AddExisting(dir.FullName, path, depthLeft - 1, result, ct);
         }
     }
 

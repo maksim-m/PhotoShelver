@@ -104,6 +104,11 @@ public class UiTests
         app.WaitReady();
         Assert.Contains("Новых 0", app.Summary.Replace(' ', ' '));
         Assert.False(app.ImportEnabled);
+
+        // The folders the import created show up at once as existing ones (the kept folder listing was renewed).
+        var lastYear = expected.Values.Max(f => f[..4])!;
+        var createdDays = expected.Values.Where(f => f.StartsWith(lastYear, StringComparison.Ordinal)).Select(Path.GetFileName).Distinct().ToList();
+        app.WaitUntil(() => createdDays.All(app.TreeNodes().Contains), "the new folders in the tree as existing ones", TimeSpan.FromSeconds(5));
     }
 
     [UiFact]
@@ -502,6 +507,36 @@ public class UiTests
     }
 
     // ------------------------------------------------------------------ settings
+
+    [UiFact]
+    public void TreeFollowsTheSelectionAndKeepsOpenFolders()
+    {
+        using var ws = new Workspace();
+        Directory.CreateDirectory(Path.Combine(ws.Library, "2020", "2020-01-01")); // an earlier import
+        using var app = new AppSession(new UiSettings(ws.Card, ws.Library), ws.Root);
+        app.WaitReady();
+        app.WaitUntil(() => app.TreeNodes().Any(n => n.Contains(" +")), "folders with files in the tree");
+        var withFiles = app.TreeNodes().Where(n => n.Contains(" +")).ToList();
+        Assert.Contains(app.TreeNodes(), n => n.EndsWith(" NEW", StringComparison.Ordinal));
+
+        // The user opens an old year.
+        var year2020 = app.FindAll("TargetTree").Single()
+            .FindFirst(TreeScope.Children, new PropertyCondition(AutomationElement.NameProperty, "2020"));
+        ((ExpandCollapsePattern)year2020.GetCurrentPattern(ExpandCollapsePattern.Pattern)).Expand();
+        app.WaitUntil(() => app.TreeNodes().Contains("2020-01-01"), "2020 open");
+
+        // Nothing selected: no counts, and the new folders (nothing goes there now) disappear.
+        app.Click("SelectNone");
+        app.WaitUntil(() => !app.TreeNodes().Any(n => n.Contains(" +") || n.EndsWith(" NEW", StringComparison.Ordinal)),
+            "counts and new folders gone");
+        Assert.Contains("2020-01-01", app.TreeNodes()); // the opened year stays open
+
+        // Everything new selected again: the same counts as before, 2020 still open.
+        app.Click("SelectAllNew");
+        app.WaitUntil(() => withFiles.All(app.TreeNodes().Contains), "the same counts again");
+        Assert.Equal(withFiles, app.TreeNodes().Where(n => n.Contains(" +")).ToList());
+        Assert.Contains("2020-01-01", app.TreeNodes());
+    }
 
     [UiFact]
     public void DamagedOrHandEditedSettingsStillOpenTheWindow()
