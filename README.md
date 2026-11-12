@@ -62,6 +62,9 @@ dotnet run --project src/PhotoShelver.App
 
 - **UI tests** — real window, real mouse; about a minute, don't touch the mouse meanwhile:
   `powershell -ExecutionPolicy Bypass -File tools/run_ui_tests.ps1`
+- **All tests in Windows Sandbox** — a disposable virtual machine that sees only `src`, `tests` and .NET (read-only, no network): nothing on this computer can be touched, and the UI tests use the sandbox's own mouse, so you can keep working (~8 min). Needs the Windows feature "Windows Sandbox":
+  `powershell -ExecutionPolicy Bypass -File tools/run_tests_sandbox.ps1` (`-UiOnly`, `-CoreOnly`)
+- **Test safety** — every test works in its own folder under `%TEMP%\PhotoShelverTests`, which refuses paths outside itself; the UI tests refuse to start the app unless every folder it gets is such a test folder.
 - **Real volumes** — creates temporary exFAT virtual disks (one write-protected, like a locked SD card), runs the `RealVolume` tests and removes the disks; asks for administrator rights:
   `powershell -ExecutionPolicy Bypass -File tools/run_real_volume_tests.ps1`
 - **Mutation check** — breaks each safety rule in turn and expects a failing test: `python tools/mutation_check.py` (add `--ui` for the interface).

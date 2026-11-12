@@ -107,7 +107,7 @@ public class UiTests
 
         // The folders the import created show up at once as existing ones (the kept folder listing was renewed).
         var lastYear = expected.Values.Max(f => f[..4])!;
-        var createdDays = expected.Values.Where(f => f.StartsWith(lastYear, StringComparison.Ordinal)).Select(Path.GetFileName).Distinct().ToList();
+        var createdDays = expected.Values.Where(f => f.StartsWith(lastYear, StringComparison.Ordinal)).Select(f => Path.GetFileName(f)!).Distinct().ToList();
         app.WaitUntil(() => createdDays.All(app.TreeNodes().Contains), "the new folders in the tree as existing ones", TimeSpan.FromSeconds(5));
     }
 
