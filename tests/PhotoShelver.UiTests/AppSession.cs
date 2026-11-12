@@ -21,7 +21,7 @@ public sealed class UiFact : FactAttribute
     }
 }
 
-/// <summary>UI test on a read-only volume with the fixtures in "&lt;root&gt;\card" (tools/run_real_volume_tests.ps1).</summary>
+/// <summary>UI test on a read-only volume with the fixtures in "&lt;root&gt;\card" (tools/run_tests_sandbox.ps1 sets one up).</summary>
 public sealed class ReadOnlyCardUiFact : FactAttribute
 {
     public ReadOnlyCardUiFact()
@@ -29,7 +29,7 @@ public sealed class ReadOnlyCardUiFact : FactAttribute
         if (Environment.GetEnvironmentVariable("PHOTOSHELVER_UI_TESTS") != "1")
             Skip = "UI tests are opt-in (PHOTOSHELVER_UI_TESTS=1)";
         else if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("PHOTOSHELVER_TEST_READONLY_VOLUME")))
-            Skip = "needs a read-only volume: run tools/run_real_volume_tests.ps1";
+            Skip = "needs a read-only volume: run tools/run_tests_sandbox.ps1";
     }
 }
 

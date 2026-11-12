@@ -10,14 +10,17 @@ Needs the Windows feature "Windows Sandbox" (Windows 11 Pro/Enterprise), enabled
   Enable-WindowsOptionalFeature -Online -FeatureName Containers-DisposableClientVM -All
 then a restart.
 
-  powershell -ExecutionPolicy Bypass -File tools\run_tests_sandbox.ps1            # core and UI tests
+  powershell -ExecutionPolicy Bypass -File tools\run_tests_sandbox.ps1            # everything
   powershell -ExecutionPolicy Bypass -File tools\run_tests_sandbox.ps1 -UiOnly
   powershell -ExecutionPolicy Bypass -File tools\run_tests_sandbox.ps1 -CoreOnly
+  powershell -ExecutionPolicy Bypass -File tools\run_tests_sandbox.ps1 -VolumesOnly
 
-The tests on real exFAT volumes (tools\run_real_volume_tests.ps1) need virtual disks, which the sandbox does not
-offer; they keep running on this computer.
+"Volumes": the tests on real exFAT volumes. Inside the sandbox, two virtual disks are created, formatted exFAT (one is
+then attached read-only, like a write-protected card) and the RealVolume tests run on them. All of that happens on the
+sandbox's own disposable disk: the sandbox cannot see, let alone format, any disk of this computer (its folders are
+shared into it as folders, not disks). No administrator rights or UAC prompt are needed on this computer.
 #>
-param([switch]$CoreOnly, [switch]$UiOnly, [int]$TimeoutMinutes = 45)
+param([switch]$CoreOnly, [switch]$UiOnly, [switch]$VolumesOnly, [int]$TimeoutMinutes = 50)
 
 $ErrorActionPreference = "Stop"
 $Repo = Split-Path -Parent $PSScriptRoot
@@ -30,8 +33,10 @@ if (Get-Process -Name "WindowsSandbox*" -ErrorAction SilentlyContinue) { throw "
 $Dotnet = (Get-Command dotnet -ErrorAction SilentlyContinue).Source
 if (-not $Dotnet) { $Dotnet = "C:\Program Files\dotnet\dotnet.exe" }
 $DotnetRoot = Split-Path -Parent $Dotnet
-$runCore = -not $UiOnly
-$runUi = -not $CoreOnly
+$all = -not ($CoreOnly -or $UiOnly -or $VolumesOnly)
+$runCore = $all -or $CoreOnly
+$runUi = $all -or $UiOnly
+$runVolumes = $all -or $VolumesOnly
 
 # Build here, as the current user; the sandbox only runs what was built.
 & $Dotnet build (Join-Path $Repo "tests\PhotoShelver.Core.Tests") -nologo -v q
@@ -60,10 +65,39 @@ if (__UI__) {
     $env:PHOTOSHELVER_UI_TESTS = "1"
     & dotnet test "C:\PS\repo\tests\PhotoShelver.UiTests\bin\Debug\net10.0-windows\PhotoShelver.UiTests.dll" --blame-hang-timeout 5m --logger "console;verbosity=normal" *> "C:\PS\io\ui.txt"
 }
+if (__VOLUMES__) {
+    # Two exFAT virtual disks on the sandbox's own disk (diskpart: the storage cmdlets are not available here).
+    $log = "C:\PS\io\volumes.txt"
+    function Run-DiskPart([string[]]$lines) {
+        $lines | Set-Content C:\dp.txt -Encoding ascii
+        & diskpart.exe /s C:\dp.txt 2>&1 | Out-String
+    }
+    try {
+        foreach ($v in @(@{ File = "C:\pi_rw.vhdx"; Label = "PI_RW"; Letter = "X" }, @{ File = "C:\pi_ro.vhdx"; Label = "PI_RO"; Letter = "Y" })) {
+            Run-DiskPart @("create vdisk file=`"$($v.File)`" maximum=256 type=expandable", "select vdisk file=`"$($v.File)`"", "attach vdisk",
+                "create partition primary", "format fs=exfat label=$($v.Label) quick", "assign letter=$($v.Letter)") | Out-Null
+            if (-not (Test-Path "$($v.Letter):\")) { throw "virtual disk $($v.Label) did not get the letter $($v.Letter)" }
+        }
+        Copy-Item "C:\PS\repo\tests\PhotoShelver.Core.Tests\Fixtures\media" "Y:\card" -Recurse
+        # The write-protected card: the same disk attached read-only.
+        Run-DiskPart @("select vdisk file=`"C:\pi_ro.vhdx`"", "detach vdisk", "attach vdisk readonly") | Out-Null
+        for ($i = 0; $i -lt 20 -and -not (Test-Path "Y:\card"); $i++) { Start-Sleep -Milliseconds 500 }
+        if (-not (Test-Path "Y:\card")) { throw "the read-only disk is not back as Y:" }
+        $wrote = $true; try { "x" | Set-Content "Y:\probe.txt" -ErrorAction Stop } catch { $wrote = $false }
+        if ($wrote) { throw "the read-only test disk accepted a write" }
+        "volumes ready: X: exFAT writable, Y: exFAT read-only" | Set-Content $log
+        $env:PHOTOSHELVER_TEST_VOLUME = "X:\"
+        $env:PHOTOSHELVER_TEST_READONLY_VOLUME = "Y:\"
+        & dotnet test "C:\PS\repo\tests\PhotoShelver.Core.Tests\bin\Debug\net10.0-windows\PhotoShelver.Core.Tests.dll" --filter "Category=RealVolume" --logger "console;verbosity=normal" *>> $log
+        $env:PHOTOSHELVER_UI_TESTS = "1"
+        & dotnet test "C:\PS\repo\tests\PhotoShelver.UiTests\bin\Debug\net10.0-windows\PhotoShelver.UiTests.dll" --filter "Category=RealVolumeUi" --blame-hang-timeout 5m --logger "console;verbosity=normal" *>> $log
+    }
+    catch { "ERROR setting up the test volumes: $_" | Add-Content $log }
+}
 "done $(Get-Date -Format HH:mm:ss)" | Set-Content "C:\PS\io\done.txt"
 shutdown /s /t 0
 '@
-$inner.Replace("__CORE__", ('$' + "$runCore".ToLower())).Replace("__UI__", ('$' + "$runUi".ToLower())) |
+$inner.Replace("__CORE__", ('$' + "$runCore".ToLower())).Replace("__UI__", ('$' + "$runUi".ToLower())).Replace("__VOLUMES__", ('$' + "$runVolumes".ToLower())) |
     Set-Content (Join-Path $Io "run.ps1") -Encoding UTF8
 
 function Mapped([string]$hostFolder, [string]$sandboxFolder, [bool]$readOnly) {
@@ -132,11 +166,11 @@ else {
 }
 # Its window can stay behind after the shutdown: close it (it was started by this script; nothing in it is kept anyway).
 Get-Process -Name "WindowsSandbox*" -ErrorAction SilentlyContinue | Stop-Process -Force
-foreach ($part in @(@{ Name = "core"; Run = $runCore }, @{ Name = "ui"; Run = $runUi })) {
+foreach ($part in @(@{ Name = "core"; Run = $runCore }, @{ Name = "ui"; Run = $runUi }, @{ Name = "volumes"; Run = $runVolumes })) {
     if (-not $part.Run) { continue }
     $file = Join-Path $Io "$($part.Name).txt"
     "=== $($part.Name) tests ==="
     if (Test-Path $file) {
-        Get-Content $file | Where-Object { $_ -match '^\s+Failed |Error Message|^\s+(Passed|Failed|Skipped|Total):|Total tests|Passed!|Failed!' }
+        Get-Content $file | Where-Object { $_ -match '^\s+Failed |Error Message|^\s+(Passed|Failed|Skipped|Total):|Total tests|Passed!|Failed!|volumes ready|ERROR' }
     } else { "no result (the sandbox did not get that far)" }
 }
