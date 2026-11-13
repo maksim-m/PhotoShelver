@@ -24,6 +24,9 @@ public static class EmbeddedPreview
     private static readonly HashSet<string> RawExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
         ".cr2", ".cr3", ".nef", ".arw", ".dng", ".raf", ".orf", ".rw2",
+        // TIFF-based as well (the preview is found by the content); the others simply get Windows' thumbnail.
+        ".nrw", ".srf", ".sr2", ".rwl", ".pef", ".srw", ".gpr", ".3fr", ".fff", ".iiq", ".erf", ".mef", ".mos",
+        ".dcr", ".kdc", ".crw", ".mrw", ".x3f",
     };
 
     public static bool IsRaw(string path) => RawExtensions.Contains(Path.GetExtension(path));

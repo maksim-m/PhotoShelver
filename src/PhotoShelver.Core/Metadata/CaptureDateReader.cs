@@ -22,9 +22,8 @@ public sealed partial class CaptureDateReader
         CaptureDate? fromMetadata = null;
         try
         {
-            fromMetadata = OnLargeStack(() => kind == MediaKind.Photo
-                ? ReadPhoto(path)
-                : MediaTypes.IsIsoBmffVideo(path) ? ReadVideo(path) : null);
+            // Videos: dates are read from MP4/MOV-type files, recognised by their content (IsoBmffReader).
+            fromMetadata = OnLargeStack(() => kind == MediaKind.Photo ? ReadPhoto(path) : ReadVideo(path));
         }
         catch (Exception ex) when (ex is not (OutOfMemoryException or StackOverflowException or AccessViolationException))
         {

@@ -28,6 +28,8 @@ IMP = os.path.join("src", "PhotoShelver.Core", "Importing", "Importer.cs")
 DUP = os.path.join("src", "PhotoShelver.Core", "Scanning", "DuplicateDetector.cs")
 CDR = os.path.join("src", "PhotoShelver.Core", "Metadata", "CaptureDateReader.cs")
 TIR = os.path.join("src", "PhotoShelver.Core", "Metadata", "TiffIfdReader.cs")
+ISO = os.path.join("src", "PhotoShelver.Core", "Metadata", "IsoBmffReader.cs")
+EMB = os.path.join("src", "PhotoShelver.Core", "Metadata", "EmbeddedPreview.cs")
 FNT = os.path.join("src", "PhotoShelver.Core", "FileNameTemplate.cs")
 SYN = os.path.join("src", "PhotoShelver.Core", "TemplateSyntax.cs")
 PLAN = os.path.join("src", "PhotoShelver.Core", "Importing", "ImportPlan.cs")
@@ -218,7 +220,15 @@ MUTATIONS = [
     ("TIFF read with the capturing (sequential) reader", CDR,
      "new MetadataExtractor.IO.IndexedSeekingReader(stream, 0, isMotorolaByteOrder: false)",
      "new MetadataExtractor.IO.IndexedCapturingReader(stream, 4096, isMotorolaByteOrder: false)"),
-    ("a JPEG named .tif loses its date", CDR,
+    ("videos dated only when named .mp4/.mov (Insta360, GoPro MAX, CRM lose their dates)", CDR,
+     "fromMetadata = OnLargeStack(() => kind == MediaKind.Photo ? ReadPhoto(path) : ReadVideo(path));",
+     "fromMetadata = OnLargeStack(() => kind == MediaKind.Photo ? ReadPhoto(path) : Path.GetExtension(path).ToLowerInvariant() is \".mp4\" or \".mov\" ? ReadVideo(path) : null);"),
+    ("MP4/MOV structure recognised only with 'ftyp' (old QuickTime files lose their dates)", ISO,
+     "[\"ftyp\", \"moov\", \"mdat\", \"wide\", \"free\", \"skip\", \"pnot\"]",
+     "[\"ftyp\"]"),
+    ("TIFF-based RAW of other makers without the embedded preview", EMB,
+     "\".nrw\", \".srf\", \".sr2\", \".rwl\", \".pef\",",
+     "\".srf\", \".sr2\", \".rwl\","),    ("a JPEG named .tif loses its date", CDR,
      "if (EmbeddedPreview.IsTiff(path) && tiff.Valid)",
      "if (EmbeddedPreview.IsTiff(path))"),
     ("metadata errors not caught", CDR,

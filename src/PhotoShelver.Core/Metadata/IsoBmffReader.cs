@@ -34,9 +34,23 @@ internal static class IsoBmffReader
         return Read(fs);
     }
 
+    /// <summary>
+    /// Box types an ISO-BMFF / QuickTime file can start with: 'ftyp' (MP4, MOV, 3GP, Insta360, GoPro, Canon CRM…),
+    /// or the first box of an old QuickTime file without one. Decided by the content, so any extension works and other
+    /// containers (AVI, MTS, MKV, MXF…) are never misread.
+    /// </summary>
+    private static readonly HashSet<string> FirstBoxTypes = ["ftyp", "moov", "mdat", "wide", "free", "skip", "pnot"];
+
+    public static bool IsIsoBmff(Stream stream)
+    {
+        var h = ReadBytes(stream, 0, 8);
+        return h is not null && FirstBoxTypes.Contains(Encoding.Latin1.GetString(h, 4, 4));
+    }
+
     public static IsoBmffInfo Read(Stream stream)
     {
         var state = new State();
+        if (!IsIsoBmff(stream)) return new IsoBmffInfo(null, null, null);
         foreach (var box in Children(stream, 0, stream.Length))
         {
             if (box.Type == "moov")
