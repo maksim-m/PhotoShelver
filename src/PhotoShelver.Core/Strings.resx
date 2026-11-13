@@ -287,9 +287,6 @@ Details: {1}</value>
   <data name="CouldNotPrepareTheImport" xml:space="preserve">
     <value>Could not prepare the import: {0}</value>
   </data>
-  <data name="TheSecondCopyIsOnButIts" xml:space="preserve">
-    <value>the second copy is on, but its folder is not set</value>
-  </data>
   <data name="CancellingTheCurrentFileWillBeFinished" xml:space="preserve">
     <value>Cancelling… the current file will be finished</value>
   </data>

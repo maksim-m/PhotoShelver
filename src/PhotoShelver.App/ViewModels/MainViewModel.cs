@@ -20,10 +20,15 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private readonly CaptureDateReader _dateReader = new();
     private readonly HashCache _hashCache = new();
     private readonly Importer _importer = new();
+    private readonly ImportPreflight _preflight = new();
     private readonly DispatcherTimer _refreshTimer;
     private readonly DispatcherTimer _templateTimer;
     private readonly DispatcherTimer _environmentTimer;
-    private (bool Source, bool Target, bool Backup) _foldersExist;
+
+    /// <summary>The latest reading of the chosen folders (made off the UI thread, see <see cref="ReadFoldersAsync"/>).</summary>
+    private FolderState? _folders;
+    private bool _readingFolders;
+    private bool _foldersRequested;
     private readonly bool _initializing;
 
     private List<MediaItemViewModel> _items = [];
@@ -42,7 +47,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _refreshTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(120), DispatcherPriority.Background, (_, _) => { _refreshTimer!.Stop(); Refresh(); }, dispatcher) { IsEnabled = false };
         _templateTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(400), DispatcherPriority.Background, (_, _) => { _templateTimer!.Stop(); _ = RunDuplicateCheckAsync(); }, dispatcher) { IsEnabled = false };
         // A card or disk can be plugged in or removed at any time: notice it without waiting for a click.
-        _environmentTimer = new DispatcherTimer(TimeSpan.FromSeconds(2), DispatcherPriority.Background, (_, _) => CheckFolders(), dispatcher) { IsEnabled = false };
+        _environmentTimer = new DispatcherTimer(TimeSpan.FromSeconds(2), DispatcherPriority.Background, (_, _) => RequestFolderReading(), dispatcher) { IsEnabled = false };
 
         _initializing = true;
         SourcePath = settings.SourcePath;
@@ -89,6 +94,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         if (_initializing) return;
         _collapsedDays.Clear();
         _treeScrollKey = null;
+        RequestFolderReading();
         StartScan();
     }
 
@@ -99,6 +105,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         if (_initializing) return;
         Notice = null;
         ResetTreeView();
+        RequestFolderReading();
         _ = RunDuplicateCheckAsync();
         _ = FindLeftoversAsync();
     }
@@ -184,6 +191,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     {
         if (_initializing) return;
         Notice = null;
+        RequestFolderReading();
         UpdateState();
         _ = FindLeftoversAsync();
     }
@@ -198,45 +206,26 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         if (path is not null) BackupPath = path;
     }
 
-    /// <summary>Why the import cannot run with the chosen second copy, or null (also null when it is off).</summary>
-    private string? BackupProblem()
-    {
-        if (!IsBackupEnabled) return null;
-        if (string.IsNullOrWhiteSpace(BackupPath))
-            return Strings.ChooseAFolderForTheSecondCopy;
-        if (!Directory.Exists(BackupPath))
-            return Strings.BackupFolderNotFound;
-        if (PathUtil.IsReadOnlyVolume(BackupPath))
-            return Strings.BackupFolderWriteProtected;
-        if (!string.IsNullOrWhiteSpace(SourcePath) && PathUtil.AreNestedOrEqual(BackupPath, SourcePath))
-            return Strings.BackupInsideSource;
-        if (!string.IsNullOrWhiteSpace(TargetPath) && PathUtil.AreNestedOrEqual(BackupPath, TargetPath))
-            return Strings.BackupInsideTarget;
-        return null;
-    }
-
-    /// <summary>The second copy as planned for an import starting now (null when it is off).</summary>
-    private BackupPlan? CurrentBackupPlan(DateTime started) =>
-        !IsBackupEnabled || BackupPath is null || SourcePath is null ? null
-        : IsBackupMirror ? new BackupPlan(BackupPath, BackupLayout.Mirror, SourcePath)
-        : new BackupPlan(BackupPath, BackupLayout.PerImport, SourcePath, ImportPlan.NewSessionFolder(BackupPath, started));
+    /// <summary>The latest reading of the folders, if it is for the folders chosen now (null while they are being read).</summary>
+    private FolderState? CurrentFolders =>
+        _folders is { } folders && folders.IsFor(SourcePath, TargetPath, IsBackupEnabled, BackupPath) ? folders : null;
 
     /// <summary>Example, warning and the collapsed header of the "Advanced" section.</summary>
     private void UpdateAdvanced()
     {
-        BackupExample = null;
-        BackupWarning = null;
-        if (IsBackupEnabled && BackupProblem() is null && BackupPath is not null)
+        // While the folders are being read, the last example and warning stay.
+        if (CurrentFolders is { } folders)
         {
-            var now = DateTime.Now;
-            if (!IsBackupMirror)
-                BackupExample = Strings.Example + Path.Combine(BackupPath, now.ToString("yyyy-MM-dd HH-mm-ss", System.Globalization.CultureInfo.InvariantCulture), "…", ExampleFileName);
-            else if (_template is not null && _nameTemplate is not null)
-                BackupExample = Strings.Example + Path.Combine(BackupPath, _template.Format(now), _nameTemplate.Format(now, ExampleFileName));
-            if (Directory.Exists(TargetPath) && PathUtil.IsSameVolume(BackupPath, TargetPath!))
-                BackupWarning = Strings.BackupOnLibraryDrive;
-            else if (Directory.Exists(SourcePath) && PathUtil.IsSameVolume(BackupPath, SourcePath!))
-                BackupWarning = Strings.BackupOnSourceDrive;
+            BackupExample = null;
+            BackupWarning = folders.BackupWarning;
+            if (IsBackupEnabled && folders.BackupProblem is null && BackupPath is not null)
+            {
+                var now = DateTime.Now;
+                if (!IsBackupMirror)
+                    BackupExample = Strings.Example + Path.Combine(BackupPath, now.ToString("yyyy-MM-dd HH-mm-ss", System.Globalization.CultureInfo.InvariantCulture), "…", ExampleFileName);
+                else if (_template is not null && _nameTemplate is not null)
+                    BackupExample = Strings.Example + Path.Combine(BackupPath, _template.Format(now), _nameTemplate.Format(now, ExampleFileName));
+            }
         }
 
         var parts = new List<string>();
@@ -274,11 +263,50 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     partial void OnIsMoveModeChanged(bool value) { if (!_initializing) Notice = null; }
 
-    private void CheckFolders()
+    /// <summary>
+    /// Reads the chosen folders again (off the UI thread). Never two readings at once - a disk that does not answer
+    /// must not pile them up: a request during a reading is served by one more reading after it.
+    /// </summary>
+    private void RequestFolderReading()
     {
-        var now = (Directory.Exists(SourcePath), Directory.Exists(TargetPath), Directory.Exists(BackupPath));
-        if (now == _foldersExist) return;
-        _foldersExist = now;
+        if (_readingFolders)
+        {
+            _foldersRequested = true;
+            return;
+        }
+        _ = ReadFoldersAsync();
+    }
+
+    /// <summary>
+    /// Whether the folders exist, are write-protected, inside each other, on which drive: the answers can take seconds
+    /// (a sleeping hard disk, a network share that is gone), so they are read in the background. Until a reading for
+    /// the folders chosen now is there, nothing is checked and nothing imported (<see cref="CurrentFolders"/>).
+    /// </summary>
+    private async Task ReadFoldersAsync()
+    {
+        _readingFolders = true;
+        try
+        {
+            do
+            {
+                _foldersRequested = false;
+                var (source, target, backupEnabled, backup) = (SourcePath, TargetPath, IsBackupEnabled, BackupPath);
+                var state = await Task.Run(() => _preflight.ReadFolders(source, target, backupEnabled, backup));
+                ApplyFolders(state);
+            }
+            while (_foldersRequested);
+        }
+        finally
+        {
+            _readingFolders = false;
+        }
+    }
+
+    /// <summary>A new reading of the folders: a card or disk plugged in or removed, other folders chosen.</summary>
+    private void ApplyFolders(FolderState state)
+    {
+        if (state == _folders) return;
+        _folders = state;
         ForgetExistingFolders();
         UpdateState();
         ScheduleRefresh();
@@ -286,8 +314,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     public void Initialize()
     {
-        _foldersExist = (Directory.Exists(SourcePath), Directory.Exists(TargetPath), Directory.Exists(BackupPath));
         _environmentTimer.Start();
+        RequestFolderReading();
         StartScan();
         _ = FindLeftoversAsync();
     }
@@ -305,7 +333,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         var cts = _leftoverCts = new CancellationTokenSource();
         // Leftovers can be in the target and in the folder of second copies.
         var roots = new[] { TargetPath, IsBackupEnabled ? BackupPath : null }
-            .Where(r => !string.IsNullOrWhiteSpace(r) && Directory.Exists(r)).Select(r => r!).ToList();
+            .Where(r => !string.IsNullOrWhiteSpace(r)).Select(r => r!).ToList();
         if (roots.Count == 0)
         {
             _leftovers = [];
@@ -314,7 +342,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         }
         try
         {
-            var found = await Task.Run(() => roots.SelectMany(r => ImportLeftovers.Find(r, cts.Token)).ToList(), cts.Token);
+            var found = await Task.Run(() => roots.Where(Directory.Exists).SelectMany(r => ImportLeftovers.Find(r, cts.Token)).ToList(), cts.Token);
             if (cts != _leftoverCts) return;
             _leftovers = found.Select(f => f.FullName).ToList();
             LeftoversText = _leftovers.Count == 0 ? null
@@ -489,8 +517,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     }
 
     private bool CanImport() =>
-        !IsBusy && DuplicatesChecked && BlockingReason is null && _template is not null && _nameTemplate is not null && SelectedCount > 0
-        && Directory.Exists(SourcePath) && Directory.Exists(TargetPath);
+        !IsBusy && DuplicatesChecked && BlockingReason is null && CurrentFolders is { IsReady: true }
+        && _template is not null && _nameTemplate is not null && SelectedCount > 0;
 
     [RelayCommand(CanExecute = nameof(CanImport))]
     private async Task ImportAsync()
@@ -500,82 +528,53 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         var template = _template!;
         var names = _nameTemplate!;
         var mode = IsMoveMode ? ImportMode.Move : ImportMode.Copy;
-        // Checked again at the click (the folders are otherwise checked every 2 s): never import without a second copy
-        // that was asked for.
-        if (BackupProblem() is { } backupProblem)
-        {
-            Notice = backupProblem;
-            return;
-        }
-        BackupPlan? backup;
-        List<ImportJob> jobs;
-        try
-        {
-            backup = CurrentBackupPlan(DateTime.Now);
-            if (IsBackupEnabled && backup is null)
-                throw new InvalidOperationException(Strings.TheSecondCopyIsOnButIts);
-            jobs = ImportPlan.CreateJobs(_items.Where(i => i.IsSelected && i.CanBeImported).Select(i => i.File), target, template, names, backup);
-        }
-        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or IOException)
-        {
-            Notice = L.F(Strings.CouldNotPrepareTheImport, ex.Message);
-            return;
-        }
-        if (jobs.Count == 0) return;
-
-        // Only a whole write-protected volume blocks a move; single protected files are copied and kept (see Importer).
-        if (mode == ImportMode.Move && PathUtil.IsReadOnlyVolume(jobs[0].SourcePath))
-        {
-            Notice = Strings.TheSourceDriveIsWriteProtectedE;
-            NoticeHasAction = true;
-            return;
-        }
-
-        var needed = jobs.Where(j => mode == ImportMode.Copy || !PathUtil.IsSameVolume(j.SourcePath, target)).Sum(j => j.Size);
-        var backupNeeded = backup is null ? 0 : jobs.Sum(j => j.Size); // a mirror may already hold some: counted all the same
-        if (backup is not null && PathUtil.IsSameVolume(backup.Root, target))
-        {
-            needed += backupNeeded;
-            backupNeeded = 0;
-        }
-        if (PathUtil.AvailableFreeSpace(target) is { } free && needed > free)
-        {
-            Notice = L.F(Strings.NotEnoughSpaceOnTheTargetDrive, Format.Bytes(needed), Format.Bytes(free));
-            return;
-        }
-        if (backup is not null && backupNeeded > 0 && PathUtil.AvailableFreeSpace(backup.Root) is { } backupFree && backupNeeded > backupFree)
-        {
-            Notice = L.F(Strings.NotEnoughSpaceForTheSecondCopy, Format.Bytes(backupNeeded), Format.Bytes(backupFree));
-            return;
-        }
-
-        var version = typeof(MainViewModel).Assembly.GetName().Version?.ToString(3) ?? "?";
-        var log = ImportLog.Start(SettingsStore.LogsDirectory, mode, SourcePath!, target, template.Pattern, jobs, version,
-            nameTemplate: names.KeepsOriginalNames ? null : names.Pattern, backup: backup);
+        var files = _items.Where(i => i.IsSelected && i.CanBeImported).Select(i => i.File).ToList();
+        var request = new ImportRequest(files, SourcePath!, target, mode, template, names,
+            IsBackupEnabled, BackupPath, IsBackupMirror, DateTime.Now);
 
         _importCts = new CancellationTokenSource();
         var token = _importCts.Token;
-        var clock = Stopwatch.StartNew();
         ImportProgress = 0;
-        ImportStatus = L.F(Strings.Importing0Of, jobs.Count);
+        ImportStatus = L.F(Strings.Importing0Of, files.Count);
         IsImporting = true;
 
-        var progress = new Progress<ImportProgress>(p =>
-        {
-            if (token.IsCancellationRequested) return;
-            ImportProgress = p.BytesTotal == 0 ? 0 : (double)p.BytesDone / p.BytesTotal;
-            var status = L.F(Strings.ImportingOfOf, p.FilesDone, p.FilesTotal, Format.Bytes(p.BytesDone), Format.Bytes(p.BytesTotal));
-            if (clock.Elapsed > TimeSpan.FromSeconds(2) && p.BytesDone > 0)
-            {
-                var remaining = clock.Elapsed * ((double)(p.BytesTotal - p.BytesDone) / p.BytesDone);
-                status += L.F(Strings.Left, Format.Duration(remaining));
-            }
-            ImportStatus = status;
-        });
-
+        ImportLog log;
         ImportResult result;
         try
         {
+            // Everything is checked again with the folders as they are now (the background reading can be seconds old;
+            // e.g. never import without a second copy that was asked for), off the UI thread.
+            var check = await Task.Run(() => _preflight.Check(request));
+            ApplyFolders(check.Folders);
+            if (check.Problem is not null)
+            {
+                Notice = check.Problem;
+                NoticeHasAction = check.OfferCopy;
+                return;
+            }
+            // The duplicates must have been checked for the folders as they are now (not, e.g., before the target disk
+            // was plugged in); otherwise a new check runs first (started by UpdateState when the import button returns).
+            if (!DuplicatesChecked || token.IsCancellationRequested || check.Jobs is not { Count: > 0 } jobs) return;
+
+            var version = typeof(MainViewModel).Assembly.GetName().Version?.ToString(3) ?? "?";
+            log = ImportLog.Start(SettingsStore.LogsDirectory, mode, request.Source, target, template.Pattern, jobs, version,
+                nameTemplate: names.KeepsOriginalNames ? null : names.Pattern, backup: check.Backup);
+
+            var clock = Stopwatch.StartNew();
+            ImportStatus = L.F(Strings.Importing0Of, jobs.Count);
+            var progress = new Progress<ImportProgress>(p =>
+            {
+                if (token.IsCancellationRequested) return;
+                ImportProgress = p.BytesTotal == 0 ? 0 : (double)p.BytesDone / p.BytesTotal;
+                var status = L.F(Strings.ImportingOfOf, p.FilesDone, p.FilesTotal, Format.Bytes(p.BytesDone), Format.Bytes(p.BytesTotal));
+                if (clock.Elapsed > TimeSpan.FromSeconds(2) && p.BytesDone > 0)
+                {
+                    var remaining = clock.Elapsed * ((double)(p.BytesTotal - p.BytesDone) / p.BytesDone);
+                    status += L.F(Strings.Left, Format.Duration(remaining));
+                }
+                ImportStatus = status;
+            });
+
             result = await Task.Run(() => _importer.Run(jobs, mode, progress, token, log.Record));
             log.Finish(result);
         }
@@ -621,12 +620,6 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             UpdateState();
             return;
         }
-        if (!Directory.Exists(path))
-        {
-            SourcePlaceholder = Strings.FolderNotFound;
-            UpdateState();
-            return;
-        }
 
         var token = cts.Token;
         IsScanning = true;
@@ -636,7 +629,14 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         try
         {
             var recursive = IncludeSubfolders;
-            var found = await Task.Run(() => SourceScanner.Enumerate(path, recursive, token), token);
+            // Whether the folder is there is asked off the UI thread too: a card reader or a share can take seconds.
+            var found = await Task.Run(() => Directory.Exists(path) ? SourceScanner.Enumerate(path, recursive, token) : null, token);
+            token.ThrowIfCancellationRequested();
+            if (found is null)
+            {
+                SourcePlaceholder = Strings.FolderNotFound;
+                return;
+            }
             _skippedOther = found.SkippedOther;
 
             var total = found.Files.Count;
@@ -697,15 +697,17 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     /// What the last successful duplicate check was done for (target folder + template), or null.
     /// The import is allowed only when it matches the current target and template exactly - so a target that
     /// appears later (a disk plugged in) or a changed template always gets a fresh check first.
+    /// The key is null while the folders are being read: then no check starts and nothing is imported.
     /// </summary>
     private string? _checkedKey;
 
     /// <summary>Key of the last check that was started (prevents re-running a failing check in a loop).</summary>
     private string? _attemptedKey;
 
-    private string CurrentCheckKey() =>
-        (Directory.Exists(TargetPath) && !IsNested() ? PathUtil.WithoutTrailingSeparator(TargetPath!) : "")
-        + "|" + (_template?.Pattern ?? "");
+    private string? CurrentCheckKey() =>
+        CurrentFolders is not { } folders ? null
+        : (folders.TargetExists && !folders.SourceTargetNested ? PathUtil.WithoutTrailingSeparator(TargetPath!) : "")
+          + "|" + (_template?.Pattern ?? "");
 
     private bool DuplicatesChecked => _checkedKey is not null && _checkedKey == CurrentCheckKey();
 
@@ -715,15 +717,17 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         var cts = _duplicateCts = new CancellationTokenSource();
         var token = cts.Token;
         var items = _items;
+        var folders = CurrentFolders;
         _checkedKey = null;
-        if (items.Count == 0 || IsScanning)
+        // While the folders are being read the check waits: the reading starts it (UpdateState).
+        if (items.Count == 0 || IsScanning || folders is null)
         {
             ScheduleRefresh();
             return;
         }
 
         var files = items.Select(i => i.File).ToList();
-        var target = Directory.Exists(TargetPath) && !IsNested() ? TargetPath : null;
+        var target = folders.TargetExists && !folders.SourceTargetNested ? TargetPath : null;
         var template = _template;
         var key = CurrentCheckKey();
         _attemptedKey = key;
@@ -889,7 +893,9 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             TreePlaceholder = Strings.ChooseTheFolderToImportTo;
             return;
         }
-        if (!Directory.Exists(target) || template is null || IsNested())
+        // While the folders are being read the tree stays as it is: the reading refreshes it.
+        if (CurrentFolders is not { } folders) return;
+        if (!folders.TargetExists || template is null || folders.SourceTargetNested)
         {
             Tree.Clear();
             TreePlaceholder = null;
@@ -937,7 +943,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             TreePlaceholder = nodes.Count > 0 ? null
                 : IsScanning ? Strings.ReadingTheSourceFiles
                 : string.IsNullOrWhiteSpace(SourcePath) ? Strings.ChooseASourceToSeeWhereThe
-                : !Directory.Exists(SourcePath) ? Strings.SourceFolderNotFound
+                : !folders.SourceExists ? Strings.SourceFolderNotFound
                 : _items.Count == 0 ? Strings.NoPhotosOrVideosInTheSource
                 : Strings.NoFilesToImport;
         }
@@ -982,19 +988,13 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _treeScrollKey = null;
     }
 
-    private bool IsNested() =>
-        !string.IsNullOrWhiteSpace(SourcePath) && !string.IsNullOrWhiteSpace(TargetPath)
-        && PathUtil.AreNestedOrEqual(SourcePath, TargetPath);
-
     private void UpdateState()
     {
         UpdateAdvanced();
-        BlockingReason =
-            !string.IsNullOrWhiteSpace(SourcePath) && !Directory.Exists(SourcePath) ? Strings.SourceFolderNotFound :
-            !string.IsNullOrWhiteSpace(TargetPath) && !Directory.Exists(TargetPath) ? Strings.TargetFolderNotFound :
-            !string.IsNullOrWhiteSpace(TargetPath) && PathUtil.IsReadOnlyVolume(TargetPath!) ? Strings.TheTargetFolderIsOnAWrite :
-            IsNested() ? Strings.TheSourceAndTheTargetMustNot :
-            BackupProblem();
+        // Judged by the latest reading of the folders; while they are being read (milliseconds, unless a disk does not
+        // answer) the last reason stays - and the import is not possible (CanImport).
+        if (CurrentFolders is { } folders)
+            BlockingReason = folders.BlockingReason;
 
         OnPropertyChanged(nameof(IsBusy));
         ImportCommand.NotifyCanExecuteChanged();
@@ -1006,7 +1006,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         // The target or template is no longer the one the duplicates were checked for (e.g. the target disk
         // was plugged in after the check): check again. Not while typing a template (that check is debounced).
         if (_items.Count > 0 && !IsBusy && _template is not null && !_templateTimer.IsEnabled
-            && !DuplicatesChecked && CurrentCheckKey() != _attemptedKey)
+            && !DuplicatesChecked && CurrentCheckKey() is not null && CurrentCheckKey() != _attemptedKey)
             _ = RunDuplicateCheckAsync();
     }
 

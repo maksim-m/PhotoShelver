@@ -4,6 +4,11 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
-    <DebugType Condition="'$(Configuration)' == 'Release'">none</DebugType>
+  </PropertyGroup>
+  <!-- Release: debug information inside the assemblies (also in the single-file exe), so errors.log gets file names and
+       line numbers. The build folder appears as "PhotoShelver\" instead of the path on the build machine. -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <DebugType>embedded</DebugType>
+    <PathMap>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)'))=PhotoShelver\</PathMap>
   </PropertyGroup>
 </Project>

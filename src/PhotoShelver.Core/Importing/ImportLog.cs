@@ -62,7 +62,7 @@ public sealed class ImportLog
             $"{Strings.LogTemplate} {template}{Environment.NewLine}" +
             (nameTemplate is null ? "" : $"{Strings.LogNames} {nameTemplate}{Environment.NewLine}") +
             backupLine +
-            $"{Strings.LogFiles} {jobs.Count} ({Size(jobs.Sum(j => j.Size))}){Environment.NewLine}{Environment.NewLine}");
+            $"{Strings.LogFiles} {jobs.Count} ({L.Bytes(jobs.Sum(j => j.Size))}){Environment.NewLine}{Environment.NewLine}");
         return log;
     }
 
@@ -71,12 +71,12 @@ public sealed class ImportLog
         var source = outcome.Job.SourcePath;
         string line;
         if (outcome.Imported is { } imported && outcome.Problem is null)
-            line = $"[OK]       {source} → {imported.DestinationPath}  ({Size(outcome.Job.Size)}{HashText(imported)}){BackupText(imported)}";
+            line = $"[OK]       {source} → {imported.DestinationPath}  ({L.Bytes(outcome.Job.Size)}{HashText(imported)}){BackupText(imported)}";
         else if (outcome.Imported is { } kept && _mode == ImportMode.Move)
-            line = L.F(Strings.LogLineKept, source, kept.DestinationPath, Size(outcome.Job.Size), HashText(kept), BackupText(kept), outcome.Problem);
+            line = L.F(Strings.LogLineKept, source, kept.DestinationPath, L.Bytes(outcome.Job.Size), HashText(kept), BackupText(kept), outcome.Problem);
         else if (outcome.Imported is { } partial)
             // Copy mode: imported, but something else went wrong (e.g. the second copy).
-            line = L.F(Strings.LogLinePartial, source, partial.DestinationPath, Size(outcome.Job.Size), HashText(partial), BackupText(partial), outcome.Problem);
+            line = L.F(Strings.LogLinePartial, source, partial.DestinationPath, L.Bytes(outcome.Job.Size), HashText(partial), BackupText(partial), outcome.Problem);
         else
             line = L.F(Strings.LogLineError, source, outcome.Problem);
         Append(line + Environment.NewLine);
@@ -128,11 +128,4 @@ public sealed class ImportLog
     private static string BackupText(ImportedFile file) =>
         file.BackupPath is { } backup ? L.F(Strings.LogSecondCopy, backup) : "";
 
-    private static string Size(long bytes) => bytes switch
-    {
-        >= 1L << 30 => (bytes / (double)(1L << 30)).ToString("0.0", L.Culture) + Strings.GB,
-        >= 1L << 20 => (bytes / (double)(1L << 20)).ToString("0.0", L.Culture) + Strings.MB,
-        >= 1L << 10 => (bytes / (double)(1L << 10)).ToString("0", L.Culture) + Strings.KB,
-        _ => bytes + Strings.B,
-    };
 }

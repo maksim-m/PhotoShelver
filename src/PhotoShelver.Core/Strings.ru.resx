@@ -287,9 +287,6 @@
   <data name="CouldNotPrepareTheImport" xml:space="preserve">
     <value>Не удалось подготовить импорт: {0}</value>
   </data>
-  <data name="TheSecondCopyIsOnButIts" xml:space="preserve">
-    <value>вторая копия включена, но папка не задана</value>
-  </data>
   <data name="CancellingTheCurrentFileWillBeFinished" xml:space="preserve">
     <value>Отмена… текущий файл будет завершён</value>
   </data>

@@ -4,13 +4,7 @@ namespace PhotoShelver.App;
 
 internal static class Format
 {
-    public static string Bytes(long bytes) => bytes switch
-    {
-        >= 1L << 30 => (bytes / (double)(1L << 30)).ToString("0.0", L.Culture) + Strings.GB,
-        >= 1L << 20 => (bytes / (double)(1L << 20)).ToString("0.0", L.Culture) + Strings.MB,
-        >= 1L << 10 => (bytes / (double)(1L << 10)).ToString("0", L.Culture) + Strings.KB,
-        _ => bytes + Strings.B,
-    };
+    public static string Bytes(long bytes) => L.Bytes(bytes);
 
     public static string Duration(TimeSpan t) => t.TotalSeconds switch
     {

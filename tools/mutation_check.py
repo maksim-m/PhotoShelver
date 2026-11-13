@@ -34,6 +34,7 @@ LVR = os.path.join("src", "PhotoShelver.Core", "Metadata", "LegacyVideoReader.cs
 FNT = os.path.join("src", "PhotoShelver.Core", "FileNameTemplate.cs")
 SYN = os.path.join("src", "PhotoShelver.Core", "TemplateSyntax.cs")
 PLAN = os.path.join("src", "PhotoShelver.Core", "Importing", "ImportPlan.cs")
+PRE = os.path.join("src", "PhotoShelver.Core", "Importing", "ImportPreflight.cs")
 
 # (description, file, original snippet, mutated snippet)
 MUTATIONS = [
@@ -269,6 +270,32 @@ MUTATIONS = [
     ("metadata errors not caught", CDR,
      "catch (Exception ex) when (ex is not (OutOfMemoryException or StackOverflowException or AccessViolationException))\n        {\n            // Malformed",
      "catch (IOException)\n        {\n            // Malformed"),
+    # Checks before an import (ImportPreflight): what the app shows while folders are chosen, and the check at the click.
+    ("second copy problems do not block the import", PRE,
+     "        BackupProblem;\n",
+     "        null;\n"),
+    ("second copy not made by the import", PRE,
+     "request.Template, request.Names, backup);",
+     "request.Template, request.Names, null);"),
+    ("nested source/target not blocked", PRE,
+     "SourceTargetNested ? Strings.TheSourceAndTheTargetMustNot :\n",
+     ""),
+    ("unresolvable paths count as not nested", PRE,
+     "PathUtil.AreNestedOrEqual(a, b), true);",
+     "PathUtil.AreNestedOrEqual(a, b), false);"),
+    ("folders not read again at the click", PRE,
+     "var folders = ReadFolders(request.Source, request.Target, request.BackupEnabled, request.BackupPath);",
+     "var folders = new FolderState { Source = request.Source, Target = request.Target, BackupEnabled = request.BackupEnabled,"
+     " Backup = request.BackupPath, SourceExists = true, TargetExists = true, BackupExists = true };"),
+    ("move from a write-protected card not stopped", PRE,
+     "if (request.Mode == ImportMode.Move && Safe(",
+     "if (false && Safe("),
+    ("free space in the library not checked", PRE,
+     "is { } free && needed > free)",
+     "is { } free && needed > long.MaxValue)"),
+    ("second copy on the library drive not counted there", PRE,
+     "needed += backupNeeded;\n            backupNeeded = 0;",
+     ""),
 ]
 
 UI_TESTS = os.path.join("tests", "PhotoShelver.UiTests")
@@ -312,12 +339,6 @@ UI_MUTATIONS = [
     ("collapsed 'Advanced' hides the second copy", VM,
      "if (IsBackupEnabled)\n            parts.Add(",
      "if (false)\n            parts.Add("),
-    ("second copy problems do not block the import", VM,
-     "            BackupProblem();",
-     "            null;"),
-    ("second copy not made by the import", VM,
-     ".Select(i => i.File), target, template, names, backup);",
-     ".Select(i => i.File), target, template, names, null);"),
     ("window size from the settings file not checked", os.path.join("src", "PhotoShelver.App", "MainWindow.xaml.cs"),
      "Width = SaneSize(_settings.WindowWidth, MinWidth, 1280);",
      "Width = _settings.WindowWidth;"),
@@ -327,12 +348,12 @@ UI_MUTATIONS = [
     ("a folder the user opened closes when the tree updates", os.path.join("src", "PhotoShelver.App", "ViewModels", "FolderNodeViewModel.cs"),
      "SetDefaultExpanded(expansionOverrides.TryGetValue(FullPath, out var manual) ? manual : node.Count > 0);",
      "SetDefaultExpanded(node.Count > 0);"),
+    ("a new reading of the folders is ignored", VM,
+     "        _folders = state;\n",
+     ""),
     ("kept folder listing not renewed after an import", VM,
      "ForgetExistingFolders(); // the import has created folders",
      "// the import has created folders"),
-    ("nested source/target not blocked", VM,
-     'IsNested() ? Strings.TheSourceAndTheTargetMustNot :',
-     ""),
 ]
 
 CRLF = "\r\n"

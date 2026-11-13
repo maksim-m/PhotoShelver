@@ -59,6 +59,15 @@ public static class L
         return $"{n} {word}";
     }
 
+    /// <summary>A size in the language's units and number format: "1.5 GB" / "1,5 ГБ".</summary>
+    public static string Bytes(long bytes) => bytes switch
+    {
+        >= 1L << 30 => (bytes / (double)(1L << 30)).ToString("0.0", L.Culture) + Strings.GB,
+        >= 1L << 20 => (bytes / (double)(1L << 20)).ToString("0.0", L.Culture) + Strings.MB,
+        >= 1L << 10 => (bytes / (double)(1L << 10)).ToString("0", L.Culture) + Strings.KB,
+        _ => bytes + Strings.B,
+    };
+
     /// <summary>The language to use for a system language: itself when translated, English otherwise.</summary>
     public static CultureInfo Choose(CultureInfo system)
     {
