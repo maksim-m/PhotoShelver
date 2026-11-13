@@ -955,10 +955,6 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     /// <summary>Asks the view to scroll the tree so that the last node of the path is near the top.</summary>
     public event Action<IReadOnlyList<FolderNodeViewModel>>? ScrollTreeRequested;
 
-    /// <summary>
-    /// First folder (in display order) that receives files: follow nodes with additions down to the
-    /// actual destination folder, stopping at a node the user collapsed.
-    /// </summary>
     /// <summary>The target's existing folders as last listed (path|depth, folders, age); see <see cref="RefreshTreeAsync"/>.</summary>
     private (string Key, IReadOnlyList<string> Folders, Stopwatch Age)? _existingFolders;
 
@@ -967,6 +963,10 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     /// <summary>Forget the listing of the target's folders (after an import, or when folders appear or disappear).</summary>
     private void ForgetExistingFolders() => _existingFolders = null;
 
+    /// <summary>
+    /// First folder (in display order) that receives files: follow nodes with additions down to the
+    /// actual destination folder, stopping at a node the user collapsed.
+    /// </summary>
     private static FolderNodeViewModel? FirstAddition(IEnumerable<FolderNodeViewModel> roots)
     {
         var node = roots.FirstOrDefault(n => n.HasCount);

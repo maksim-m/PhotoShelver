@@ -88,9 +88,10 @@ if (__VOLUMES__) {
         "volumes ready: X: exFAT writable, Y: exFAT read-only" | Set-Content $log
         $env:PHOTOSHELVER_TEST_VOLUME = "X:\"
         $env:PHOTOSHELVER_TEST_READONLY_VOLUME = "Y:\"
-        & dotnet test "C:\PS\repo\tests\PhotoShelver.Core.Tests\bin\Debug\net10.0-windows\PhotoShelver.Core.Tests.dll" --filter "Category=RealVolume" --logger "console;verbosity=normal" *>> $log
+        # Separate files: appending a test run's output to the log would mix two text encodings in one file.
+        & dotnet test "C:\PS\repo\tests\PhotoShelver.Core.Tests\bin\Debug\net10.0-windows\PhotoShelver.Core.Tests.dll" --filter "Category=RealVolume" --blame-hang-timeout 5m --logger "console;verbosity=normal" *> "C:\PS\io\volumes-core.txt"
         $env:PHOTOSHELVER_UI_TESTS = "1"
-        & dotnet test "C:\PS\repo\tests\PhotoShelver.UiTests\bin\Debug\net10.0-windows\PhotoShelver.UiTests.dll" --filter "Category=RealVolumeUi" --blame-hang-timeout 5m --logger "console;verbosity=normal" *>> $log
+        & dotnet test "C:\PS\repo\tests\PhotoShelver.UiTests\bin\Debug\net10.0-windows\PhotoShelver.UiTests.dll" --filter "Category=RealVolumeUi" --blame-hang-timeout 5m --logger "console;verbosity=normal" *> "C:\PS\io\volumes-ui.txt"
     }
     catch { "ERROR setting up the test volumes: $_" | Add-Content $log }
 }
@@ -166,11 +167,27 @@ else {
 }
 # Its window can stay behind after the shutdown: close it (it was started by this script; nothing in it is kept anyway).
 Get-Process -Name "WindowsSandbox*" -ErrorAction SilentlyContinue | Stop-Process -Force
-foreach ($part in @(@{ Name = "core"; Run = $runCore }, @{ Name = "ui"; Run = $runUi }, @{ Name = "volumes"; Run = $runVolumes })) {
-    if (-not $part.Run) { continue }
-    $file = Join-Path $Io "$($part.Name).txt"
-    "=== $($part.Name) tests ==="
-    if (Test-Path $file) {
-        Get-Content $file | Where-Object { $_ -match '^\s+Failed |Error Message|^\s+(Passed|Failed|Skipped|Total):|Total tests|Passed!|Failed!|volumes ready|ERROR' }
-    } else { "no result (the sandbox did not get that far)" }
+# Every expected test run must have finished with a summary and no failures; anything else is reported as a problem
+# (a missing or cut-off result is never taken for a pass).
+$expected = @()
+if ($runCore) { $expected += @{ Name = "core tests"; File = "core.txt" } }
+if ($runUi) { $expected += @{ Name = "UI tests"; File = "ui.txt" } }
+if ($runVolumes) {
+    $expected += @{ Name = "volume tests (core)"; File = "volumes-core.txt" }
+    $expected += @{ Name = "volume tests (UI)"; File = "volumes-ui.txt" }
 }
+$problems = @()
+if ($runVolumes -and (Test-Path (Join-Path $Io "volumes.txt"))) { Get-Content (Join-Path $Io "volumes.txt") }
+foreach ($part in $expected) {
+    $file = Join-Path $Io $part.File
+    "=== $($part.Name) ==="
+    if (-not (Test-Path $file)) { "no result (the sandbox did not get that far)"; $problems += $part.Name; continue }
+    $lines = Get-Content $file
+    $lines | Where-Object { $_ -cmatch '^\s+Failed |Error Message|^\s+(Passed|Failed|Skipped):|Total tests|ERROR' }
+    $total = $lines | Where-Object { $_ -match '^\s*Total tests:' }
+    $failed = $lines | Where-Object { $_ -match '^\s+Failed:\s+[1-9]' }
+    if (-not $total -or $failed) { $problems += $part.Name }
+}
+""
+if ($problems.Count -eq 0) { "ALL PASSED" }
+else { "PROBLEMS in: " + ($problems -join ", ") + "  (details in $Io)"; exit 1 }

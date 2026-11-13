@@ -306,7 +306,7 @@ def run_tests(dotnet, ui=False):
             return None
         args = [dotnet, "test", UI_TESTS, "--no-build", "-nologo", "-v", "q", "--blame-hang-timeout", "5m"]
     else:
-        args = [dotnet, "test", TESTS, "-nologo", "-v", "q"]
+        args = [dotnet, "test", TESTS, "-nologo", "-v", "q", "--blame-hang-timeout", "5m"]
     proc = subprocess.run(args, cwd=REPO, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace")
     out = proc.stdout + proc.stderr
     m = re.search(r"Failed:\s+(\d+), Passed:\s+(\d+)", out)
