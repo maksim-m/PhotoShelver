@@ -3,7 +3,11 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
-    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <!-- A warning fails the build (locally and in CI): it is fixed right away or suppressed with a reason. -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- packages.lock.json: the exact versions (and content hashes) of all packages, direct and indirect.
+         CI restores in locked mode: a package that changed without the lock file being updated fails the build. -->
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
   </PropertyGroup>
   <!-- Release: debug information inside the assemblies (also in the single-file exe), so errors.log gets file names and
        line numbers. The build folder appears as "PhotoShelver\" instead of the path on the build machine. -->

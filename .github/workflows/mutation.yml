@@ -1,0 +1,45 @@
+# The mutation check of the core tests (tools/mutation_check.py): breaks safety-critical code on purpose, one place
+# at a time, and fails if the tests do not notice. Long (one test run per mutation), so only started by hand:
+# Actions > Mutation check > Run workflow. "only" limits it to mutations whose name contains that text.
+name: Mutation check
+
+on:
+  workflow_dispatch:
+    inputs:
+      only:
+        description: "Only mutations whose name contains this text (empty: all)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: "true"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "true"
+
+jobs:
+  mutations:
+    runs-on: windows-2025
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          global-json-file: global.json
+
+      - name: Restore (exactly the versions in packages.lock.json)
+        run: dotnet restore --locked-mode
+
+      - name: Mutation check
+        env:
+          ONLY: ${{ inputs.only }}
+          TEMP: ${{ runner.temp }}
+          TMP: ${{ runner.temp }}
+        shell: pwsh
+        run: |
+          if ($env:ONLY) { python tools/mutation_check.py "--only=$env:ONLY" } else { python tools/mutation_check.py }
+          exit $LASTEXITCODE

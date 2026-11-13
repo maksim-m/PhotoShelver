@@ -1,0 +1,83 @@
+# Every push to main and every pull request: build with warnings as errors, the core tests, the UI tests (the real
+# window, driven through UI Automation), and the exe as a downloadable artifact.
+# Not here: the tests on exFAT volumes (they need Windows Sandbox: tools/run_tests_sandbox.ps1) and the mutation check
+# (long; see mutation.yml).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: "true"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "true"
+
+jobs:
+  build-and-test:
+    runs-on: windows-2025
+    timeout-minutes: 40
+    steps:
+      # Actions are pinned to a commit (a tag can be moved); the version is in the comment.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          global-json-file: global.json
+
+      - name: Restore (exactly the versions in packages.lock.json)
+        run: dotnet restore --locked-mode
+
+      # Debug, like local runs and the sandbox (the UI tests start the app from bin\Debug).
+      - name: Build
+        run: dotnet build --no-restore -c Debug
+
+      - name: Core tests
+        env:
+          TEMP: ${{ runner.temp }}
+          TMP: ${{ runner.temp }}
+        run: >
+          dotnet test tests/PhotoShelver.Core.Tests --no-build -c Debug --blame-hang-timeout 5m
+          --logger "console;verbosity=normal" --logger trx --results-directory TestResults/core
+
+      - name: UI tests
+        if: ${{ !cancelled() }}
+        env:
+          PHOTOSHELVER_UI_TESTS: "1"
+          TEMP: ${{ runner.temp }}
+          TMP: ${{ runner.temp }}
+        run: >
+          dotnet test tests/PhotoShelver.UiTests --no-build -c Debug --blame-hang-timeout 5m
+          --logger "console;verbosity=normal" --logger trx --results-directory TestResults/ui
+
+      - name: Test results and UI screenshots
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-results
+          path: |
+            TestResults
+            ${{ runner.temp }}/PhotoShelverUiTests/**/*.png
+          retention-days: 14
+          if-no-files-found: ignore
+
+      # Restores again for Release (the self-contained runtime), still in locked mode.
+      - name: Publish the exe
+        run: dotnet publish src/PhotoShelver.App -c Release -o publish -p:RestoreLockedMode=true
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: PhotoShelver-${{ github.sha }}
+          path: publish/PhotoShelver.exe
+          retention-days: 14
+          if-no-files-found: error

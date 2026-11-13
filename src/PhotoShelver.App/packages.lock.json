@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "dependencies": {
+    "net10.0-windows7.0": {
+      "CommunityToolkit.Mvvm": {
+        "type": "Direct",
+        "requested": "[8.4.1, )",
+        "resolved": "8.4.1",
+        "contentHash": "BTRteP8SvFyd/4KAreIFJBcxD2O9trLxLDD/p8YkSDDrfFOzy2U8cHyz6r+5Eh4kDhJdzAVglei6a+Bh4jCpUA=="
+      },
+      "Microsoft.NET.ILLink.Tasks": {
+        "type": "Direct",
+        "requested": "[10.0.14, )",
+        "resolved": "10.0.14",
+        "contentHash": "YlTamXppEQls6DYWt7RdUuwWDb0lyw/vXCaGeQpLCpsLmfwGuCkOz/vIGgMTV7ECsJcavkCOkxZXv9s8rdAHkQ=="
+      },
+      "GeoTimeZone": {
+        "type": "Transitive",
+        "resolved": "6.1.0",
+        "contentHash": "HB3OJcaI2NNfB253co3XY0dUFllCtdR8Jn0kS7GR/m8XMhvEgurDfvgebNeac384S+OOvrgb7HEGbZXOps/8Mw=="
+      },
+      "MetadataExtractor": {
+        "type": "Transitive",
+        "resolved": "2.9.2",
+        "contentHash": "lSLFUdPuSpyDh5ls1cFHRGSP9vxy/aRZFPaSMSxKpmgzl4lYhpsUd7+pcmcR3xEVjfS7Bsc2JJq5hAUc+nH+qw==",
+        "dependencies": {
+          "XmpCore": "6.1.10.1"
+        }
+      },
+      "System.IO.Hashing": {
+        "type": "Transitive",
+        "resolved": "10.0.13",
+        "contentHash": "ZlcywyQ7FJmgOV2nctdfOEPGS0kRK8T2CdOoPr6F4HPYpmjSo6GQfj3yTyOzNO6B+2U84/JKSPkJJMWqLmVsMw=="
+      },
+      "XmpCore": {
+        "type": "Transitive",
+        "resolved": "6.1.10.1",
+        "contentHash": "/Tp2/e39e7z8hLtS4TXt0FNNZHbf5yNFfHS0/59soXlgOzZlyRZivvzWpvujyaWkTWWgecp/1nHxkuc5vntn7A=="
+      },
+      "photoshelver.core": {
+        "type": "Project",
+        "dependencies": {
+          "GeoTimeZone": "[6.1.0, )",
+          "MetadataExtractor": "[2.9.2, )",
+          "System.IO.Hashing": "[10.0.13, )"
+        }
+      }
+    },
+    "net10.0-windows7.0/win-x64": {}
+  }
+}

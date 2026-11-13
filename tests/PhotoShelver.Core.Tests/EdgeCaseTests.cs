@@ -76,7 +76,7 @@ public class EdgeCaseTests
     // ---- Source with a junction loop (folder link pointing to its parent) ----
 
     [Fact]
-    public void JunctionLoopInSourceDoesNotHangTheScan()
+    public async Task JunctionLoopInSourceDoesNotHangTheScan()
     {
         using var dir = new TempDir();
         dir.File(@"card\DCIM\IMG.JPG", "x");
@@ -88,9 +88,10 @@ public class EdgeCaseTests
         mklink.WaitForExit();
         Assert.True(Directory.Exists(loop), "junction was not created");
 
-        var task = Task.Run(() => SourceScanner.Enumerate(Path.Combine(dir.Path, "card"), recursive: true));
-        Assert.True(task.Wait(TimeSpan.FromSeconds(20)), "enumeration did not finish");
-        Assert.Single(task.Result.Files);
+        var scan = Task.Run(() => SourceScanner.Enumerate(Path.Combine(dir.Path, "card"), recursive: true));
+        // WaitAsync throws TimeoutException when the enumeration hangs.
+        var found = await scan.WaitAsync(TimeSpan.FromSeconds(20));
+        Assert.Single(found.Files);
 
         Directory.Delete(loop); // removes the link only
     }
