@@ -41,6 +41,25 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private CancellationTokenSource? _treeCts;
     private CancellationTokenSource? _importCts;
 
+    /// <summary>
+    /// The app's version for the import log: "1.2.0" for a release, "1.3.0-beta.1+0a1b2c3" for a pre-release,
+    /// "0.0.0-dev+0a1b2c3" for a local build (the commit it was built from, shortened).
+    /// </summary>
+    private static readonly string AppVersion = ShortVersion(
+        typeof(MainViewModel).Assembly.GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
+            .OfType<System.Reflection.AssemblyInformationalVersionAttribute>().FirstOrDefault()?.InformationalVersion
+        ?? typeof(MainViewModel).Assembly.GetName().Version?.ToString(3) ?? "?");
+
+    internal static string ShortVersion(string informational)
+    {
+        var plus = informational.IndexOf('+');
+        if (plus < 0) return informational;
+        var version = informational[..plus];
+        var commit = informational[(plus + 1)..];
+        // A release is named by its tag alone; anything else also by its commit.
+        return !version.Contains('-') ? version : $"{version}+{commit[..Math.Min(7, commit.Length)]}";
+    }
+
     public MainViewModel(Dispatcher dispatcher, AppSettings settings)
     {
         _thumbnails = new ThumbnailService(dispatcher);
@@ -556,8 +575,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             // was plugged in); otherwise a new check runs first (started by UpdateState when the import button returns).
             if (!DuplicatesChecked || token.IsCancellationRequested || check.Jobs is not { Count: > 0 } jobs) return;
 
-            var version = typeof(MainViewModel).Assembly.GetName().Version?.ToString(3) ?? "?";
-            log = ImportLog.Start(SettingsStore.LogsDirectory, mode, request.Source, target, template.Pattern, jobs, version,
+            log = ImportLog.Start(SettingsStore.LogsDirectory, mode, request.Source, target, template.Pattern, jobs, AppVersion,
                 nameTemplate: names.KeepsOriginalNames ? null : names.Pattern, backup: check.Backup);
 
             var clock = Stopwatch.StartNew();
