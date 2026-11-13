@@ -40,6 +40,7 @@ jobs:
 
       # Debug, like local runs and the sandbox (the UI tests start the app from bin\Debug).
       - name: Build
+        id: build
         run: dotnet build --no-restore -c Debug
 
       - name: Core tests
@@ -51,7 +52,7 @@ jobs:
           --logger "console;verbosity=normal" --logger trx --results-directory TestResults/core
 
       - name: UI tests
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         env:
           PHOTOSHELVER_UI_TESTS: "1"
           TEMP: ${{ runner.temp }}
