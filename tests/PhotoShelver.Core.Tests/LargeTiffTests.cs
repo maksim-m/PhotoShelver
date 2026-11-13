@@ -273,14 +273,18 @@ public class LargeTiffTests
     /// so a BigTIFF is never given to it - whatever the file is called.
     /// </summary>
     [Theory]
-    [InlineData("scan.tif")]
-    [InlineData("IMG_0001.CR2")]
-    [InlineData("IMG_0001.JPG")]
-    public void ABigTiffWithAHugeDirectoryDoesNotEndTheApp(string name)
+    [InlineData("scan.tif", 0)]
+    [InlineData("IMG_0001.CR2", 0)]
+    [InlineData("IMG_0001.JPG", 0)]
+    [InlineData("scan.tif", 1)]
+    [InlineData("IMG_0001.NEF", 0xFF)]
+    public void ABigTiffWithAHugeDirectoryDoesNotEndTheApp(string name, byte reserved)
     {
         var count = new byte[8];
         BinaryPrimitives.WriteUInt64LittleEndian(count, 15_000_000);
-        var chunks = new SortedList<long, byte[]> { [0] = ToArray(Tiff(true, false, 4096, 4096)).AsSpan(0, 16).ToArray(), [4096] = count };
+        var header = ToArray(Tiff(true, false, 4096, 4096)).AsSpan(0, 16).ToArray();
+        header[6] = reserved; // the library does not check the reserved field: neither may the routing
+        var chunks = new SortedList<long, byte[]> { [0] = header, [4096] = count };
         var damaged = new SparseStream(1 * GB, chunks); // under 2 GB: larger streams make the library stop earlier
 
         var reader = new CaptureDateReader(TimeZoneInfo.Utc) { OpenMedia = _ => damaged };

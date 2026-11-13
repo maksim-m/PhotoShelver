@@ -117,6 +117,25 @@ public class FormatCoverageTests
         Assert.Equal(expected, reader.Read(withoutFtyp, MediaKind.Video, FileTime));
     }
 
+    [Fact]
+    public void AQuickTimeFileStartingWithAnotherBoxIsDatedToo()
+    {
+        // Not one of the usual first boxes, but a well-formed chain that contains 'moov'.
+        using var dir = new TempDir();
+        var original = Path.Combine(Fixtures.MediaRoot, "video", "VID_apple.MOV");
+        var bytes = File.ReadAllBytes(original);
+        var ftypSize = (int)BinaryPrimitives.ReadUInt32BigEndian(bytes);
+        var uuid = new byte[32];
+        BinaryPrimitives.WriteUInt32BigEndian(uuid, 32);
+        "uuid"u8.CopyTo(uuid.AsSpan(4));
+        var path = Path.Combine(dir.Path, "MVI_0001.MOV");
+        File.WriteAllBytes(path, [.. uuid, .. bytes[ftypSize..]]);
+        var reader = new CaptureDateReader(Fixtures.Berlin);
+
+        Assert.Equal(reader.Read(original, MediaKind.Video, FileTime), reader.Read(path, MediaKind.Video, FileTime));
+        using (var s = File.OpenRead(path)) Assert.True(IsoBmffReader.IsIsoBmff(s));
+    }
+
     public static TheoryData<string, byte[]> OtherContainers() => new()
     {
         { "MVI_0001.AVI", Riff("AVI ") },

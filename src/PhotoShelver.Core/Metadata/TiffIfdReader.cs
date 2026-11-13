@@ -30,10 +30,12 @@ internal sealed class TiffIfdReader
         _little = h[0] == (byte)'I';
         if (U16(h, 2) == 43)
         {
-            // BigTIFF: offset size 8, a reserved zero, then the 8-byte offset of the first IFD.
-            var big = Read(start, 16);
-            if (big is null || U16(big, 4) != 8 || U16(big, 6) != 0) return;
+            // BigTIFF: offset size 8, a reserved field (zero, but not checked - the metadata library does not check it
+            // either), then the 8-byte offset of the first IFD. Any header with 43 counts as BigTIFF, readable or not,
+            // so that it is never given to the library (see CaptureDateReader.MetadataStackSize).
             IsBigTiff = true;
+            var big = Read(start, 16);
+            if (big is null || U16(big, 4) != 8) return;
             FirstIfd = Offset(U64(big, 8));
         }
         else

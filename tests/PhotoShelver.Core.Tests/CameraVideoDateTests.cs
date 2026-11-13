@@ -164,6 +164,7 @@ public class CameraVideoDateTests
     [InlineData("Sat Mar  2 23:59:01 2024\n\0", 2024, 3, 2, 23, 59, 1)]
     [InlineData("2012/05/27 16:11:38\0", 2012, 5, 27, 16, 11, 38)]     // Pentax
     [InlineData("2019:10:11 00:05:00", 2019, 10, 11, 0, 5, 0)]
+    [InlineData("Mon Jul 04 17:06:39 2002\n\0", 2002, 7, 4, 17, 6, 39)] // a wrong weekday: the date decides
     public void AviIditChunkGivesTheCameraClock(string idit, int y, int mo, int d, int h, int mi, int s)
     {
         var avi = Avi(List("hdrl", Chunk("avih", new byte[56]), List("strl", Chunk("strh", new byte[56])), Chunk("IDIT", Encoding.ASCII.GetBytes(idit))),
@@ -219,6 +220,7 @@ public class CameraVideoDateTests
             packet[4] = 0x47;
             packet[5] = 0x40;
             packet[6] = 0x11;
+            packet[7] = 0x10; // payload only
             if (p == 3) sei.AsSpan(0, Math.Min(sei.Length, 180)).CopyTo(packet.AsSpan(12));
             stream.AddRange(packet);
         }
@@ -248,6 +250,55 @@ public class CameraVideoDateTests
 
         Assert.Equal(DateSource.Metadata, date.Source);
         Assert.Equal(new DateTime(y, mo, d, h, mi, s), date.Local);
+    }
+
+    /// <summary>
+    /// The SEI split over two packets of the video stream, with an audio packet in between and an adaptation field in
+    /// the second video packet: the payloads have to be joined per stream before the block is read.
+    /// </summary>
+    [Theory]
+    [InlineData(192, 30)]
+    [InlineData(192, 47)]
+    [InlineData(188, 40)]
+    public void AvchdMdpmSplitOverPacketsIsJoined(int packetSize, int splitAfter)
+    {
+        var sei = (byte[])[0x00, 0x00, 0x00, 0x01, 0x06, 0x05, 0x40, .. MdpmUuid, .. "MDPM"u8, 5, .. Entries(0x2A, 2017, 3, 16, 23, 59, 58), 0x80];
+        var sync = packetSize == 192 ? 4 : 0;
+        byte[] Packet(int pid, bool adaptation, ReadOnlySpan<byte> payload)
+        {
+            var packet = new byte[packetSize];
+            packet[sync] = 0x47;
+            packet[sync + 1] = (byte)(pid >> 8);
+            packet[sync + 2] = (byte)pid;
+            packet[sync + 3] = (byte)(adaptation ? 0x30 : 0x10);
+            var at = sync + 4;
+            if (adaptation)
+            {
+                var stuffing = 188 - 4 - 1 - payload.Length;
+                packet[at] = (byte)stuffing;
+                Array.Fill(packet, (byte)0xFF, at + 1, stuffing);
+                at += 1 + stuffing;
+            }
+            else
+            {
+                Array.Fill(packet, (byte)0xFF, at + payload.Length, 188 - 4 - payload.Length); // filler NAL bytes
+            }
+            payload.CopyTo(packet.AsSpan(at));
+            return packet;
+        }
+        var first = sei.AsSpan(0, splitAfter);
+        var stream = (byte[])[
+            .. Packet(0x0000, false, new byte[184]),                          // PAT
+            .. Packet(0x1011, false, [.. new byte[184 - first.Length], .. first]), // video: the start of the SEI at its end
+            .. Packet(0x1100, false, new byte[184]),                          // audio in between
+            .. Packet(0x1011, true, sei.AsSpan(splitAfter)),                  // video: the rest, after an adaptation field
+            .. Packet(0x1011, false, new byte[184]),
+        ];
+
+        var date = Read(stream, "00000.MTS", TimeZoneInfo.Utc);
+
+        Assert.Equal(DateSource.Metadata, date.Source);
+        Assert.Equal(new DateTime(2017, 3, 16, 23, 59, 58), date.Local);
     }
 
     [Fact]

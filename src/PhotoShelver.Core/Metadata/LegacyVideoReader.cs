@@ -14,8 +14,11 @@ internal static class LegacyVideoReader
     private const int MaxChunks = 256;
     private const int MaxIditLength = 64;
 
-    /// <summary>How far into an AVCHD file to look for MDPM: it comes with the first frame, near the start.</summary>
-    internal const int AvchdSearchBytes = 1024 * 1024;
+    /// <summary>
+    /// How far into an AVCHD file to look for MDPM: it comes with the first frame (in camera files within the first
+    /// 14 KB). Kept small: a card can hold hundreds of clips, and some cameras (Panasonic GH1) write no MDPM at all.
+    /// </summary>
+    internal const int AvchdSearchBytes = 256 * 1024;
 
     // ---------------------------------------------------------------- AVI
 
@@ -59,10 +62,15 @@ internal static class LegacyVideoReader
 
     internal static DateTime? ParseIdit(string text)
     {
-        var clean = string.Join(' ', text.Replace('\0', ' ').Split(' ', '\r', '\n', '\t').Where(p => p.Length > 0));
-        return DateTime.TryParseExact(clean, IditFormats, CultureInfo.InvariantCulture, DateTimeStyles.None, out var d) && Sane(d)
-            ? d
-            : null;
+        var parts = text.Replace('\0', ' ').Split(' ', '\r', '\n', '\t').Where(p => p.Length > 0).ToList();
+        var clean = string.Join(' ', parts);
+        if (DateTime.TryParseExact(clean, IditFormats, CultureInfo.InvariantCulture, DateTimeStyles.None, out var d))
+            return Sane(d) ? d : null;
+        // asctime() with a weekday that does not match the date (a camera bug): the date itself decides.
+        if (parts.Count == 5 && parts[0].Length == 3 && parts[0].All(char.IsAsciiLetter)
+            && DateTime.TryParseExact(string.Join(' ', parts.Skip(1)), "MMM d HH:mm:ss yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out d))
+            return Sane(d) ? d : null;
+        return null;
     }
 
     // ---------------------------------------------------------------- AVCHD
@@ -73,18 +81,42 @@ internal static class LegacyVideoReader
 
     public static DateTime? ReadAvchdDate(Stream s)
     {
-        var head = Read(s, 0, (int)Math.Min(s.Length, 8));
-        if (head is null || head.Length < 8) return null;
-        // MPEG transport stream: 0x47 sync byte at 0 (.TS, 188-byte packets) or at 4 (.MTS/.M2TS, 192-byte packets).
-        if (head[0] != 0x47 && head[4] != 0x47) return null;
-
         var data = Read(s, 0, (int)Math.Min(s.Length, AvchdSearchBytes));
-        if (data is null) return null;
-        for (var at = data.AsSpan().IndexOf(MdpmMarker); at >= 0;)
+        if (data is null || data.Length < 192) return null;
+
+        // MPEG transport stream: .MTS/.M2TS have 192-byte packets (a 4-byte timestamp, then the 0x47 sync byte),
+        // .TS 188-byte packets. Two sync bytes one packet apart identify it.
+        int size, sync;
+        if (data[4] == 0x47 && (data.Length < 197 || data[196] == 0x47)) (size, sync) = (192, 4);
+        else if (data[0] == 0x47 && data[188] == 0x47) (size, sync) = (188, 0);
+        else return null;
+
+        // The MDPM block can straddle packets, with packets of other streams in between: join the payloads of each
+        // stream (PID) first, then search.
+        var payloads = new Dictionary<int, List<byte>>();
+        for (var p = 0; p + size <= data.Length; p += size)
         {
-            if (ParseMdpm(data.AsSpan(at + MdpmMarker.Length)) is { } date) return date;
-            var next = data.AsSpan(at + 1).IndexOf(MdpmMarker);
-            at = next < 0 ? -1 : at + 1 + next;
+            var ts = p + sync;
+            if (data[ts] != 0x47) break; // lost sync: damaged
+            var pid = ((data[ts + 1] & 0x1F) << 8) | data[ts + 2];
+            var adaptation = (data[ts + 3] >> 4) & 3; // 1 payload, 2 adaptation field only, 3 both
+            if (adaptation is 0 or 2) continue;
+            var start = ts + 4 + (adaptation == 3 ? 1 + data[ts + 4] : 0);
+            var end = ts + 188;
+            if (start >= end) continue;
+            if (!payloads.TryGetValue(pid, out var list)) payloads[pid] = list = [];
+            list.AddRange(data.AsSpan(start, end - start));
+        }
+
+        foreach (var list in payloads.Values)
+        {
+            var stream = System.Runtime.InteropServices.CollectionsMarshal.AsSpan(list);
+            for (var at = stream.IndexOf(MdpmMarker); at >= 0;)
+            {
+                if (ParseMdpm(stream[(at + MdpmMarker.Length)..]) is { } date) return date;
+                var next = stream[(at + 1)..].IndexOf(MdpmMarker);
+                at = next < 0 ? -1 : at + 1 + next;
+            }
         }
         return null;
     }

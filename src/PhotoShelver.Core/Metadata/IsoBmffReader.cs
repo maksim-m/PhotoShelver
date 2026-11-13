@@ -49,10 +49,26 @@ internal static partial class IsoBmffReader
     /// </summary>
     private static readonly HashSet<string> FirstBoxTypes = ["ftyp", "moov", "mdat", "wide", "free", "skip", "pnot"];
 
+    private const int MaxTopLevelBoxes = 64;
+
+    /// <summary>
+    /// The file starts with a known first box, or else its top level is a chain of well-formed boxes with readable type
+    /// names that contains 'moov' (a file starting with e.g. 'uuid' or 'junk'). AVI, MPEG-TS, Matroska, MXF… never
+    /// pass: their first bytes give no readable type name or an impossible size.
+    /// </summary>
     public static bool IsIsoBmff(Stream stream)
     {
         var h = ReadBytes(stream, 0, 8);
-        return h is not null && FirstBoxTypes.Contains(Encoding.Latin1.GetString(h, 4, 4));
+        if (h is null) return false;
+        if (FirstBoxTypes.Contains(Encoding.Latin1.GetString(h, 4, 4))) return true;
+        var n = 0;
+        foreach (var box in Children(stream, 0, stream.Length))
+        {
+            if (!box.Type.All(c => c is >= ' ' and <= '~' or '©')) return false;
+            if (box.Type == "moov") return true;
+            if (++n >= MaxTopLevelBoxes) return false;
+        }
+        return false;
     }
 
     public static IsoBmffInfo Read(Stream stream)
