@@ -7,6 +7,7 @@ A mutation that leaves all tests green is reported as NOT CAUGHT - that is a gap
 Usage (from anywhere):
   python tools/mutation_check.py        core mutations, checked by the core tests
   python tools/mutation_check.py --ui   UI mutations, checked by the UI tests (opens app windows)
+  python tools/mutation_check.py --only=TIFF --only=stack   only the mutations whose name contains one of these
 Exit code: 0 if every mutation was caught, 1 otherwise.
 
 When code changes so that a snippet below no longer exists, the script stops with an error -
@@ -26,6 +27,7 @@ TESTS = os.path.join("tests", "PhotoShelver.Core.Tests")
 IMP = os.path.join("src", "PhotoShelver.Core", "Importing", "Importer.cs")
 DUP = os.path.join("src", "PhotoShelver.Core", "Scanning", "DuplicateDetector.cs")
 CDR = os.path.join("src", "PhotoShelver.Core", "Metadata", "CaptureDateReader.cs")
+TIR = os.path.join("src", "PhotoShelver.Core", "Metadata", "TiffIfdReader.cs")
 FNT = os.path.join("src", "PhotoShelver.Core", "FileNameTemplate.cs")
 SYN = os.path.join("src", "PhotoShelver.Core", "TemplateSyntax.cs")
 PLAN = os.path.join("src", "PhotoShelver.Core", "Importing", "ImportPlan.cs")
@@ -196,14 +198,29 @@ MUTATIONS = [
      "if (seconds == 0 || seconds > (ulong)(DateTime.MaxValue - Epoch1904).TotalSeconds) return null;",
      "if (seconds == 0) return null;"),
     ("TIFF metadata read sequentially again (whole file when it comes after the image)", CDR,
-     "if (EmbeddedPreview.IsTiff(path))",
+     "if (EmbeddedPreview.IsTiff(path) && tiff.Valid)",
      "if (false)"),
+    ("metadata read on a normal stack (library stack overflow ends the app)", CDR,
+     "    {\n        T result = default!;",
+     "    {\n        if (DateTime.Now.Year > 0) return read();\n        T result = default!;"),
+    ("BigTIFF given to the library (huge directory on the stack)", CDR,
+     "if (tiff.IsBigTiff) return ExifDate(ReadTiffDates(stream));",
+     "if (tiff.IsBigTiff && EmbeddedPreview.IsRaw(path)) return ExifDate(ReadTiffDates(stream));"),
+    ("TIFF with metadata beyond 2 GB: no own reader after the library fails", CDR,
+     "            return ExifDate(ReadTiffDates(stream));\n        }",
+     "            return null;\n        }"),
+    ("BigTIFF IFD8 pointer not read", TIR,
+     "4 or 13 => 4, 16 or 18 => 8,",
+     "4 or 13 => 4,"),
+    ("TIFF reader may read past the end of the file", TIR,
+     "offset < _start || offset > _end - count",
+     "offset < _start || offset > _end"),
     ("TIFF read with the capturing (sequential) reader", CDR,
      "new MetadataExtractor.IO.IndexedSeekingReader(stream, 0, isMotorolaByteOrder: false)",
      "new MetadataExtractor.IO.IndexedCapturingReader(stream, 4096, isMotorolaByteOrder: false)"),
     ("a JPEG named .tif loses its date", CDR,
-     "catch (Exception ex) when (ex is not (OutOfMemoryException or StackOverflowException or AccessViolationException))\n            {\n                // Not a TIFF after all",
-     "catch (Exception ex) when (ex is OutOfMemoryException)\n            {\n                // Not a TIFF after all"),
+     "if (EmbeddedPreview.IsTiff(path) && tiff.Valid)",
+     "if (EmbeddedPreview.IsTiff(path))"),
     ("metadata errors not caught", CDR,
      "catch (Exception ex) when (ex is not (OutOfMemoryException or StackOverflowException or AccessViolationException))\n        {\n            // Malformed",
      "catch (IOException)\n        {\n            // Malformed"),
@@ -336,6 +353,11 @@ def main():
     dotnet = find_dotnet()
     ui = "--ui" in sys.argv
     mutations = UI_MUTATIONS if ui else MUTATIONS
+    only = [a[len("--only="):] for a in sys.argv if a.startswith("--only=")]
+    if only:
+        mutations = [m for m in mutations if any(o.lower() in m[0].lower() for o in only)]
+        if not mutations:
+            sys.exit(f"No mutation matches {only}")
 
     def run():
         return run_tests(dotnet, ui)

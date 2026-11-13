@@ -18,7 +18,7 @@ PhotoShelver does one job:
 
 ## Highlights
 
-- **Sorted by the real capture date.** EXIF for photos; for videos the camera's own clock (Canon), Apple's date with time zone, or the GPS position's time zone — so photos and videos from one moment land in the same folder. Files without metadata fall back to the modification date (and are marked).
+- **Sorted by the real capture date.** EXIF for photos; for videos the camera's own clock (Canon), Apple's date with time zone, or the GPS position's time zone — so photos and videos from one moment land in the same folder. Files without metadata fall back to the modification date (and are marked). Also TIFF scans of any size (metadata beyond 2 GB, BigTIFF), and a damaged file can never crash the app.
 - **Duplicates are recognised by content.** Files that are already in the library (from an earlier import) or appear twice on the card are dimmed and not selected — detected by a 128-bit content hash, not by name.
 - **Your folder scheme.** `{YYYY}/{YYYY}-{MM}-{DD}` by default, or any template with `{YYYY}`, `{YY}`, `{MM}`, `{MMM}`, `{DD}` and `/` — text outside the braces is kept as is; mistakes are explained as you type, and an invalid template never lets the import start.
 - **Optional second copy.** Under *Advanced*: every imported file is also copied to another folder — a folder per import with the card's own names (like Lightroom), or a mirror of the library. When moving, the card is cleared only after *both* copies are verified.

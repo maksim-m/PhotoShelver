@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Runtime.ExceptionServices;
 using System.Text.RegularExpressions;
 using GeoTimeZone;
 using MetadataExtractor;
@@ -21,9 +22,9 @@ public sealed partial class CaptureDateReader
         CaptureDate? fromMetadata = null;
         try
         {
-            fromMetadata = kind == MediaKind.Photo
+            fromMetadata = OnLargeStack(() => kind == MediaKind.Photo
                 ? ReadPhoto(path)
-                : MediaTypes.IsIsoBmffVideo(path) ? ReadVideo(path) : null;
+                : MediaTypes.IsIsoBmffVideo(path) ? ReadVideo(path) : null);
         }
         catch (Exception ex) when (ex is not (OutOfMemoryException or StackOverflowException or AccessViolationException))
         {
@@ -35,25 +36,101 @@ public sealed partial class CaptureDateReader
             DateSource.FileModified);
     }
 
-    /// <summary>Opens a TIFF for reading its metadata. Test hook: lets a test count the bytes read.</summary>
-    internal Func<string, Stream> OpenTiff { get; init; } =
+    /// <summary>
+    /// Stack of the thread that reads metadata. The metadata library allocates the entry table of every TIFF directory
+    /// on the stack (the entry count from the file times 12 bytes, up to 786 KB, nested directories recursively); a
+    /// damaged count in a TIFF, a TIFF-based RAW or EXIF overflows a normal 1 MB stack, and a stack overflow ends the
+    /// whole app - it cannot be caught. Only reserved address space: the memory is used only as far as it is needed.
+    /// </summary>
+    internal const int MetadataStackSize = 256 * 1024 * 1024;
+
+    private static T OnLargeStack<T>(Func<T> read)
+    {
+        T result = default!;
+        ExceptionDispatchInfo? error = null;
+        var thread = new Thread(() =>
+        {
+            try { result = read(); }
+            catch (Exception ex) { error = ExceptionDispatchInfo.Capture(ex); }
+        }, MetadataStackSize) { IsBackground = true, Name = "Metadata" };
+        thread.Start();
+        thread.Join();
+        error?.Throw();
+        return result;
+    }
+
+    /// <summary>Opens a photo for reading its metadata. Test hook: lets a test supply the content and count the bytes read.</summary>
+    internal Func<string, Stream> OpenPhoto { get; init; } =
         path => new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, 4096);
 
     private CaptureDate? ReadPhoto(string path)
     {
-        if (EmbeddedPreview.IsTiff(path))
+        using var stream = OpenPhoto(path);
+        var tiff = new TiffIfdReader(stream, 0, stream.Length);
+
+        // BigTIFF never goes to the library: there a directory's table can be as large as the file (see MetadataStackSize).
+        if (tiff.IsBigTiff) return ExifDate(ReadTiffDates(stream));
+
+        if (EmbeddedPreview.IsTiff(path) && tiff.Valid)
         {
             try
             {
-                using var stream = OpenTiff(path);
-                return ExifDate(ReadTiff(stream));
+                if (ExifDate(ReadTiff(stream)) is { } date) return date;
             }
             catch (Exception ex) when (ex is not (OutOfMemoryException or StackOverflowException or AccessViolationException))
             {
-                // Not a TIFF after all (e.g. a mislabelled JPEG) or damaged: the usual reading detects the format itself.
+                // Damaged, or beyond the library (see ReadTiffDates).
+            }
+            // A TIFF never goes to the usual reader: it would read the whole file to come to the same directories.
+            return ExifDate(ReadTiffDates(stream));
+        }
+
+        // Everything else, including a mislabelled .tif (e.g. a JPEG): the usual reading detects the format itself.
+        stream.Position = 0;
+        return ExifDate(ImageMetadataReader.ReadMetadata(stream, Path.GetFileName(path)));
+    }
+
+    private const int MaxDateLength = 64;
+    private const int TagExifIfdPointer = 0x8769;
+
+    /// <summary>
+    /// The three EXIF dates of a TIFF, read with our own minimal reader: the library keeps positions in a 32-bit signed
+    /// number and fails on metadata beyond 2 GB in the file (classic TIFF allows 4 GB); BigTIFF is never given to it.
+    /// The dates are returned in the library's own directory types, so they are interpreted exactly like its own.
+    /// </summary>
+    internal static List<MetadataExtractor.Directory> ReadTiffDates(Stream stream)
+    {
+        var directories = new List<MetadataExtractor.Directory>();
+        var tiff = new TiffIfdReader(stream, 0, stream.Length);
+        if (!tiff.Valid || tiff.ReadIfd(tiff.FirstIfd, out _) is not { } ifd0) return directories;
+
+        var main = new ExifIfd0Directory();
+        directories.Add(main);
+        long exifIfd = 0;
+        foreach (var e in ifd0)
+        {
+            if (e.Tag == ExifDirectoryBase.TagDateTime) SetDate(main, tiff, e);
+            else if (e.Tag == TagExifIfdPointer) exifIfd = tiff.Value(e);
+        }
+
+        if (exifIfd > 0 && exifIfd != tiff.FirstIfd && tiff.ReadIfd(exifIfd, out _) is { } exifEntries)
+        {
+            var exif = new ExifSubIfdDirectory();
+            directories.Add(exif);
+            foreach (var e in exifEntries)
+            {
+                if (e.Tag is ExifDirectoryBase.TagDateTimeOriginal or ExifDirectoryBase.TagDateTimeDigitized)
+                    SetDate(exif, tiff, e);
             }
         }
-        return ExifDate(ImageMetadataReader.ReadMetadata(path));
+        return directories;
+
+        static void SetDate(MetadataExtractor.Directory dir, TiffIfdReader tiff, TiffIfdReader.Entry e)
+        {
+            if (tiff.Ascii(e, MaxDateLength) is not { } bytes) return;
+            var end = Array.IndexOf(bytes, (byte)0);
+            dir.Set(e.Tag, new StringValue(end < 0 ? bytes : bytes[..end], System.Text.Encoding.ASCII));
+        }
     }
 
     /// <summary>

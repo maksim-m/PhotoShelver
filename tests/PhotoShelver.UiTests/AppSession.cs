@@ -366,7 +366,9 @@ public sealed class AppSession : IDisposable
 
     public void StartImport()
     {
-        Assert.True(ImportEnabled, "Import button is disabled. " + Diagnostics());
+        // The button follows the state through a debounced refresh (a short timer at background priority), which can
+        // come a moment after the status text has gone - longer on a busy machine: wait for it rather than look once.
+        WaitUntil(() => ImportEnabled, "Import button to become enabled", TimeSpan.FromSeconds(10), Diagnostics);
         Click("Import");
     }
 

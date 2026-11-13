@@ -68,7 +68,7 @@ public static class EmbeddedPreview
         try
         {
             using var s = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, 4096);
-            var tiff = new TiffReader(s, 0, s.Length);
+            var tiff = new TiffIfdReader(s, 0, s.Length);
             var ifd0 = tiff.Valid ? tiff.ReadIfd(tiff.FirstIfd, out _) : null;
             if (ifd0 is null) return null;
             long width = 0, height = 0, orientation = 1;
@@ -90,7 +90,7 @@ public static class EmbeddedPreview
 
     private static PreviewImage? FromTiff(Stream s, long baseOffset, long end)
     {
-        var tiff = new TiffReader(s, baseOffset, end);
+        var tiff = new TiffIfdReader(s, baseOffset, end);
         if (!tiff.Valid) return null;
 
         var candidates = new List<(long Offset, int Length)>();
@@ -146,7 +146,7 @@ public static class EmbeddedPreview
                         if (canon.Type == "THMB") AddJpegInside(s, canon, candidates);
                         if (canon.Type == "CMT1")
                         {
-                            var tiff = new TiffReader(s, canon.Payload, canon.End);
+                            var tiff = new TiffIfdReader(s, canon.Payload, canon.End);
                             var ifd0 = tiff.Valid ? tiff.ReadIfd(tiff.FirstIfd, out _) : null;
                             if (ifd0?.FirstOrDefault(e => e.Tag == 0x0112) is { Tag: 0x0112 } o) orientation = (int)tiff.Value(o);
                         }
@@ -191,7 +191,7 @@ public static class EmbeddedPreview
         var jpeg = Read(s, offset, (int)Math.Min(length, 128 * 1024));
         if (jpeg is not null && JpegExifTiffStart(jpeg) is { } tiffStart)
         {
-            var tiff = new TiffReader(new MemoryStream(jpeg), tiffStart, jpeg.Length);
+            var tiff = new TiffIfdReader(new MemoryStream(jpeg), tiffStart, jpeg.Length);
             var ifd0 = tiff.Valid ? tiff.ReadIfd(tiff.FirstIfd, out _) : null;
             if (ifd0?.FirstOrDefault(e => e.Tag == 0x0112) is { Tag: 0x0112 } o) orientation = (int)tiff.Value(o);
         }
@@ -299,78 +299,5 @@ public static class EmbeddedPreview
         var buffer = new byte[count];
         s.ReadExactly(buffer);
         return buffer;
-    }
-
-    /// <summary>Minimal TIFF IFD reader (both byte orders), bounded to [start, end).</summary>
-    private sealed class TiffReader
-    {
-        private readonly Stream _s;
-        private readonly long _start;
-        private readonly long _end;
-        private readonly bool _little;
-
-        public readonly record struct Entry(ushort Tag, ushort Type, uint Count, long ValueField);
-
-        public TiffReader(Stream s, long start, long end)
-        {
-            _s = s;
-            _start = start;
-            _end = Math.Min(end, s.Length);
-            var h = Read(s, start, 8);
-            if (h is null) return;
-            _little = h[0] == (byte)'I';
-            if (h[0] != h[1] || (h[0] != (byte)'I' && h[0] != (byte)'M')) return;
-            FirstIfd = U32(h, 4);
-            Valid = FirstIfd > 0;
-        }
-
-        public bool Valid { get; }
-        public long FirstIfd { get; }
-
-        public List<Entry>? ReadIfd(long ifd, out long next)
-        {
-            next = 0;
-            var countBytes = Read(_s, _start + ifd, 2);
-            if (countBytes is null || _start + ifd + 2 > _end) return null;
-            var count = U16(countBytes, 0);
-            if (count is 0 or > 512) return null;
-            var raw = Read(_s, _start + ifd + 2, count * 12 + 4);
-            if (raw is null) return null;
-            var entries = new List<Entry>(count);
-            for (var i = 0; i < count; i++)
-            {
-                var o = i * 12;
-                entries.Add(new Entry(U16(raw, o), U16(raw, o + 2), U32(raw, o + 4), _start + ifd + 2 + o + 8));
-            }
-            next = U32(raw, count * 12);
-            return entries;
-        }
-
-        public long Value(Entry e) => Values(e).FirstOrDefault();
-
-        public long[] Values(Entry e)
-        {
-            var size = e.Type switch { 3 => 2, 4 or 13 => 4, _ => 0 };
-            if (size == 0 || e.Count is 0 or > 1024) return [];
-            var total = (int)(size * e.Count);
-            long at = e.ValueField;
-            if (total > 4)
-            {
-                var pointer = Read(_s, e.ValueField, 4);
-                if (pointer is null) return [];
-                at = _start + U32(pointer, 0);
-            }
-            var data = Read(_s, at, total);
-            if (data is null) return [];
-            var values = new long[e.Count];
-            for (var i = 0; i < e.Count; i++) values[i] = size == 2 ? U16(data, i * 2) : U32(data, i * 4);
-            return values;
-        }
-
-        private ushort U16(byte[] b, int o) =>
-            _little ? BinaryPrimitives.ReadUInt16LittleEndian(b.AsSpan(o)) : BinaryPrimitives.ReadUInt16BigEndian(b.AsSpan(o));
-
-        private uint U32(byte[] b, int o) =>
-            _little ? BinaryPrimitives.ReadUInt32LittleEndian(b.AsSpan(o)) : BinaryPrimitives.ReadUInt32BigEndian(b.AsSpan(o));
     }
 }
