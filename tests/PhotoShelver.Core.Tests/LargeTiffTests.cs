@@ -79,7 +79,7 @@ public class LargeTiffTests
     /// <summary>Reads through the app's own path; the file itself does not exist, so only the stream can give a date.</summary>
     private static CaptureDate ReadThroughTheApp(Stream tiff)
     {
-        var reader = new CaptureDateReader(TimeZoneInfo.Utc) { OpenPhoto = _ => tiff };
+        var reader = new CaptureDateReader(TimeZoneInfo.Utc) { OpenMedia = _ => tiff };
         return reader.Read(Path.Combine(TempDir.Root, "does-not-exist", "scan.tif"), MediaKind.Photo,
             new DateTime(2000, 1, 1, 0, 0, 0, DateTimeKind.Utc));
     }
@@ -259,7 +259,7 @@ public class LargeTiffTests
         w.Bytes(Encoding.ASCII.GetBytes(IfdDate.ToString("yyyy:MM:dd HH:mm:ss") + "\0"));
         var bytes = w.ToArray();
 
-        var reader = new CaptureDateReader(TimeZoneInfo.Utc) { OpenPhoto = _ => new MemoryStream(bytes) };
+        var reader = new CaptureDateReader(TimeZoneInfo.Utc) { OpenMedia = _ => new MemoryStream(bytes) };
         var date = reader.Read(Path.Combine(TempDir.Root, "does-not-exist", name), MediaKind.Photo,
             new DateTime(2000, 1, 1, 0, 0, 0, DateTimeKind.Utc));
 
@@ -283,7 +283,7 @@ public class LargeTiffTests
         var chunks = new SortedList<long, byte[]> { [0] = ToArray(Tiff(true, false, 4096, 4096)).AsSpan(0, 16).ToArray(), [4096] = count };
         var damaged = new SparseStream(1 * GB, chunks); // under 2 GB: larger streams make the library stop earlier
 
-        var reader = new CaptureDateReader(TimeZoneInfo.Utc) { OpenPhoto = _ => damaged };
+        var reader = new CaptureDateReader(TimeZoneInfo.Utc) { OpenMedia = _ => damaged };
         var date = reader.Read(Path.Combine(TempDir.Root, "does-not-exist", name), MediaKind.Photo,
             new DateTime(2000, 1, 1, 0, 0, 0, DateTimeKind.Utc));
 

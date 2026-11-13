@@ -97,7 +97,7 @@ public class TiffMetadataTests
         var path = Path.Combine(dir.Path, "scan.tif");
         File.WriteAllBytes(path, Tiff(bigEndian: false, pixelBytes: 32 * 1024 * 1024, withExif: true));
         CountingStream? opened = null;
-        var reader = new CaptureDateReader { OpenPhoto = p => opened = new CountingStream(File.OpenRead(p)) };
+        var reader = new CaptureDateReader { OpenMedia = p => opened = new CountingStream(File.OpenRead(p)) };
 
         var date = reader.Read(path, MediaKind.Photo, DateTime.UtcNow);
 

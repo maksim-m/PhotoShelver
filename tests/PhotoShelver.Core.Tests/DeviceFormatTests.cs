@@ -10,7 +10,8 @@ namespace PhotoShelver.Core.Tests;
 public class DeviceFormatTests
 {
     [Theory]
-    // Canon MP4: EXIF in the embedded thumbnail (camera clock 23:40, +01:00) wins over mvhd UTC (22:40 -> 00:40 in Berlin summer).
+    // Canon MP4: EXIF in the embedded thumbnail (camera clock 23:40, +01:00) wins over mvhd (22:40 here; read as UTC it would be
+    // 00:40 the next day in Berlin summer - and real Canon files even hold the camera clock in mvhd, not UTC).
     [InlineData("VID_canon.MP4", "2026-07-14 23:40:00", DateSource.Metadata)]
     // Canon CR3: EXIF in moov/uuid/CMT2.
     [InlineData("IMG_canon.CR3", "2026-03-07 23:50:00", DateSource.Metadata)]

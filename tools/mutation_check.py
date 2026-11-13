@@ -30,6 +30,7 @@ CDR = os.path.join("src", "PhotoShelver.Core", "Metadata", "CaptureDateReader.cs
 TIR = os.path.join("src", "PhotoShelver.Core", "Metadata", "TiffIfdReader.cs")
 ISO = os.path.join("src", "PhotoShelver.Core", "Metadata", "IsoBmffReader.cs")
 EMB = os.path.join("src", "PhotoShelver.Core", "Metadata", "EmbeddedPreview.cs")
+LVR = os.path.join("src", "PhotoShelver.Core", "Metadata", "LegacyVideoReader.cs")
 FNT = os.path.join("src", "PhotoShelver.Core", "FileNameTemplate.cs")
 SYN = os.path.join("src", "PhotoShelver.Core", "TemplateSyntax.cs")
 PLAN = os.path.join("src", "PhotoShelver.Core", "Importing", "ImportPlan.cs")
@@ -228,7 +229,30 @@ MUTATIONS = [
      "[\"ftyp\"]"),
     ("TIFF-based RAW of other makers without the embedded preview", EMB,
      "\".nrw\", \".srf\", \".sr2\", \".rwl\", \".pef\",",
-     "\".srf\", \".sr2\", \".rwl\","),    ("a JPEG named .tif loses its date", CDR,
+     "\".srf\", \".sr2\", \".rwl\","),    ("Canon MOV: camera EXIF in moov/udta ignored", ISO,
+     "case \"CNTH\": // Canon MOV",
+     "case \"CNTH-\": // Canon MOV"),
+    ("Sony XML local time with offset ignored", CDR,
+     "if (!sonyIsUtc) return new CaptureDate(sonyLocal, DateSource.Metadata);",
+     ""),
+    ("GoPro firmware not recognised (mvhd camera clock read as UTC)", ISO,
+     "return text.StartsWith(\"HD\", StringComparison.Ordinal)",
+     "return false && text.StartsWith(\"HD\", StringComparison.Ordinal)"),
+    ("GoPro telemetry box not recognised", ISO,
+     "case \"GPMF\": // GoPro telemetry settings (HERO5 and later)\n                    state.GoPro = true;",
+     "case \"GPMF\": // GoPro telemetry settings (HERO5 and later)\n                    state.GoPro |= false;"),
+    ("AVI IDIT not read", LVR,
+     "if (id == \"IDIT\" && size",
+     "if (id == \"IDIX\" && size"),
+    ("AVI IDIT searched inside the frame data too", LVR,
+     "Encoding.ASCII.GetString(h, 8, 4) != \"movi\"",
+     "Encoding.ASCII.GetString(h, 8, 4) != \"MOVI\""),
+    ("AVCHD emulation bytes not removed", LVR,
+     "if (zeros >= 2 && b == 0x03) { zeros = 0; continue; }",
+     ""),
+    ("unset camera clocks (1970/1980) taken as capture dates", LVR,
+     "d.Year >= 1990 &&",
+     "d.Year >= 1 &&"),    ("a JPEG named .tif loses its date", CDR,
      "if (EmbeddedPreview.IsTiff(path) && tiff.Valid)",
      "if (EmbeddedPreview.IsTiff(path))"),
     ("metadata errors not caught", CDR,

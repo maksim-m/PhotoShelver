@@ -58,13 +58,13 @@ public sealed partial class CaptureDateReader
         return result;
     }
 
-    /// <summary>Opens a photo for reading its metadata. Test hook: lets a test supply the content and count the bytes read.</summary>
-    internal Func<string, Stream> OpenPhoto { get; init; } =
+    /// <summary>Opens a photo or video for reading its metadata. Test hook: lets a test supply the content and count the bytes read.</summary>
+    internal Func<string, Stream> OpenMedia { get; init; } =
         path => new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, 4096);
 
     private CaptureDate? ReadPhoto(string path)
     {
-        using var stream = OpenPhoto(path);
+        using var stream = OpenMedia(path);
         var tiff = new TiffIfdReader(stream, 0, stream.Length);
 
         // BigTIFF never goes to the library: there a directory's table can be as large as the file (see MetadataStackSize).
@@ -175,8 +175,12 @@ public sealed partial class CaptureDateReader
 
     private CaptureDate? ReadVideo(string path)
     {
-        var info = IsoBmffReader.Read(path);
-        return ResolveVideoDate(info);
+        using var stream = OpenMedia(path);
+        if (IsoBmffReader.IsIsoBmff(stream)) return ResolveVideoDate(IsoBmffReader.Read(stream));
+
+        // Older containers: the camera's own clock, like EXIF.
+        var cameraClock = LegacyVideoReader.ReadAviDate(stream) ?? LegacyVideoReader.ReadAvchdDate(stream);
+        return cameraClock is { } local ? new CaptureDate(local, DateSource.Metadata) : null;
     }
 
     internal CaptureDate? ResolveVideoDate(IsoBmffInfo info)
@@ -202,6 +206,17 @@ public sealed partial class CaptureDateReader
                 // A damaged thumbnail: continue with the container's own times.
             }
         }
+
+        // 2b. Sony's XML: newer cameras give their local time with the zone offset (exact); older ones UTC ('Z').
+        if (TryParseAppleDate(info.SonyCreationDate, out var sonyLocal, out var sonyIsUtc))
+        {
+            if (!sonyIsUtc) return new CaptureDate(sonyLocal, DateSource.Metadata);
+            info = info with { CreationUtc = info.CreationUtc ?? sonyLocal };
+        }
+
+        // 2c. Cameras that write their own clock into mvhd (GoPro): local time already, like their photos.
+        if (info.MvhdIsLocalTime && info.CreationUtc is { } cameraClock)
+            return new CaptureDate(DateTime.SpecifyKind(cameraClock, DateTimeKind.Unspecified), DateSource.Metadata);
 
         if (info.CreationUtc is not { } utc) return null;
         utc = DateTime.SpecifyKind(utc, DateTimeKind.Utc);

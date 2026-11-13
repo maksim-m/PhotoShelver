@@ -4,21 +4,29 @@ using System.Text;
 namespace PhotoShelver.Core.Metadata;
 
 /// <summary>Date/location information extracted from an MP4/MOV (ISO-BMFF / QuickTime) container.</summary>
+/// <param name="CreationUtc">moov/mvhd creation time - UTC by the specification, but see <paramref name="MvhdIsLocalTime"/>.</param>
 /// <param name="EmbeddedJpeg">
-/// A JPEG thumbnail the camera embedded in the container together with its own EXIF (Canon: moov/uuid/CNTH/CNDA).
-/// Its EXIF holds the capture time on the camera's clock - the same clock its photos use.
+/// A JPEG thumbnail the camera embedded in the container together with its own EXIF (Canon: CNTH/CNDA, in moov/uuid
+/// in MP4 files, in moov/udta in MOV files). Its EXIF holds the capture time on the camera's clock - the same clock its
+/// photos use.
+/// </param>
+/// <param name="SonyCreationDate">Sony's XML (top-level meta/xml, NonRealTimeMeta/CreationDate): with a zone offset or 'Z'.</param>
+/// <param name="MvhdIsLocalTime">
+/// The camera writes its own clock (local time) into mvhd instead of UTC, as GoPro cameras do (verified with GPS time).
 /// </param>
 internal sealed record IsoBmffInfo(
     DateTime? CreationUtc,
     string? AppleCreationDate,
     string? Iso6709Location,
-    byte[]? EmbeddedJpeg = null);
+    byte[]? EmbeddedJpeg = null,
+    string? SonyCreationDate = null,
+    bool MvhdIsLocalTime = false);
 
 /// <summary>
 /// Minimal reader for the parts of MP4/MOV files we need: moov/mvhd creation time,
 /// Apple metadata keys (com.apple.quicktime.creationdate / location.ISO6709) and udta/©xyz.
 /// </summary>
-internal static class IsoBmffReader
+internal static partial class IsoBmffReader
 {
     private static readonly DateTime Epoch1904 = new(1904, 1, 1, 0, 0, 0, DateTimeKind.Utc);
     private const int MaxDepth = 8;
@@ -51,15 +59,21 @@ internal static class IsoBmffReader
     {
         var state = new State();
         if (!IsIsoBmff(stream)) return new IsoBmffInfo(null, null, null);
+        var moovSeen = false;
         foreach (var box in Children(stream, 0, stream.Length))
         {
-            if (box.Type == "moov")
+            if (box.Type == "moov" && !moovSeen)
             {
                 ParseContainer(stream, box, state, 1);
-                break;
+                moovSeen = true;
+            }
+            else if (box.Type == "meta")
+            {
+                state.SonyCreationDate ??= ReadSonyXmlDate(stream, box); // Sony: next to moov, not inside it
             }
         }
-        return new IsoBmffInfo(state.CreationUtc, state.AppleCreationDate, state.AppleLocation ?? state.UdtaLocation, state.EmbeddedJpeg);
+        return new IsoBmffInfo(state.CreationUtc, state.AppleCreationDate, state.AppleLocation ?? state.UdtaLocation,
+            state.EmbeddedJpeg, state.SonyCreationDate, state.GoPro);
     }
 
     private sealed class State
@@ -69,6 +83,8 @@ internal static class IsoBmffReader
         public string? AppleLocation;
         public string? UdtaLocation;
         public byte[]? EmbeddedJpeg;
+        public string? SonyCreationDate;
+        public bool GoPro;
     }
 
     private readonly record struct Box(string Type, long PayloadStart, long End);
@@ -95,9 +111,47 @@ internal static class IsoBmffReader
                 case "uuid":
                     state.EmbeddedJpeg ??= ReadCanonThumbnail(s, box);
                     break;
+                case "CNTH": // Canon MOV: directly in moov/udta
+                    state.EmbeddedJpeg ??= ReadCnda(s, box);
+                    break;
+                case "FIRM": // GoPro firmware, e.g. "HD6.01.02.01.00" (HERO6), "H22.01.01.10.70" (HERO11)
+                    state.GoPro |= IsGoProFirmware(ReadBytes(s, box.PayloadStart, (int)Math.Min(32, box.End - box.PayloadStart)));
+                    break;
+                case "GPMF": // GoPro telemetry settings (HERO5 and later)
+                    state.GoPro = true;
+                    break;
             }
         }
     }
+
+    private static bool IsGoProFirmware(byte[]? firm)
+    {
+        if (firm is null || firm.Length < 4) return false;
+        var text = Encoding.ASCII.GetString(firm);
+        return text.StartsWith("HD", StringComparison.Ordinal) && char.IsAsciiDigit(text[2])
+               || text[0] == 'H' && char.IsAsciiDigit(text[1]) && char.IsAsciiDigit(text[2]) && text[3] == '.';
+    }
+
+    private const long MaxXml = 256 * 1024;
+
+    /// <summary>Sony XAVC: top-level meta (full box) / xml (full box) with NonRealTimeMeta; returns CreationDate/@value.</summary>
+    private static string? ReadSonyXmlDate(Stream s, Box meta)
+    {
+        foreach (var box in Children(s, meta.PayloadStart + 4, meta.End))
+        {
+            if (box.Type != "xml ") continue;
+            var length = box.End - box.PayloadStart - 4;
+            if (length is <= 0 or > MaxXml) return null;
+            var xml = ReadBytes(s, box.PayloadStart + 4, (int)length);
+            if (xml is null) return null;
+            var match = SonyCreationDate().Match(Encoding.UTF8.GetString(xml));
+            return match.Success ? match.Groups[1].Value : null;
+        }
+        return null;
+    }
+
+    [System.Text.RegularExpressions.GeneratedRegex("<CreationDate\\s+value\\s*=\\s*\"([^\"]{10,40})\"")]
+    private static partial System.Text.RegularExpressions.Regex SonyCreationDate();
 
     /// <summary>moov/uuid(Canon)/CNTH/CNDA: the JPEG thumbnail with the camera's EXIF.</summary>
     private static byte[]? ReadCanonThumbnail(Stream s, Box uuid)
@@ -106,13 +160,19 @@ internal static class IsoBmffReader
         if (id is null || new Guid(id, bigEndian: true) != CanonUuid) return null;
         foreach (var cnth in Children(s, uuid.PayloadStart + 16, uuid.End))
         {
-            if (cnth.Type != "CNTH") continue;
-            foreach (var cnda in Children(s, cnth.PayloadStart, cnth.End))
-            {
-                var length = cnda.End - cnda.PayloadStart;
-                if (cnda.Type == "CNDA" && length is > 4 and <= MaxEmbeddedJpeg)
-                    return ReadBytes(s, cnda.PayloadStart, (int)length);
-            }
+            if (cnth.Type == "CNTH" && ReadCnda(s, cnth) is { } jpeg) return jpeg;
+        }
+        return null;
+    }
+
+    /// <summary>CNTH/CNDA: Canon's JPEG thumbnail with EXIF.</summary>
+    private static byte[]? ReadCnda(Stream s, Box cnth)
+    {
+        foreach (var cnda in Children(s, cnth.PayloadStart, cnth.End))
+        {
+            var length = cnda.End - cnda.PayloadStart;
+            if (cnda.Type == "CNDA" && length is > 4 and <= MaxEmbeddedJpeg)
+                return ReadBytes(s, cnda.PayloadStart, (int)length);
         }
         return null;
     }
