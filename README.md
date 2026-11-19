@@ -29,6 +29,7 @@ PhotoShelver does one job:
 - **RAW-friendly.** RAW thumbnails come from the preview the camera embedded — fast and without installing codecs. TIFF scans are shown upright.
 - **Fast on big cards.** Thousands of files are scanned in seconds; thumbnails load for what is on screen first. Disks are checked in the background, so a slow or sleeping one does not freeze the window.
 - **Native look.** Windows 11 Fluent design, light and dark theme, English and Russian interface (follows the Windows display language).
+- **Private and offline.** PhotoShelver never connects to the internet: no account, no telemetry, no update checks. The time zone of a GPS position is looked up in data built into the app. Settings and import logs stay on your computer.
 - **One file, nothing to install.** A self-contained `PhotoShelver.exe`; the .NET runtime is inside.
 
 ## Safety first
