@@ -7,7 +7,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, "compat/**"]
   pull_request:
   workflow_dispatch:
   workflow_call:
@@ -30,7 +30,13 @@ env:
 
 jobs:
   build-and-test:
-    runs-on: windows-2025
+    # windows-2022 (Server 2022, build 20348): a Windows before 11, the closest GitHub has to Windows 10 (no Mica,
+    # maybe no Segoe Fluent Icons): the app must work and look right there too.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2025, windows-2022]
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 40
     steps:
       # Actions are pinned to a commit (a tag can be moved); the version is in the comment.
@@ -104,7 +110,7 @@ jobs:
         if: ${{ failure() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: test-results
+          name: test-results-${{ matrix.os }}
           path: |
             TestResults
             ${{ runner.temp }}/PhotoShelverUiTests/**/*.png
@@ -122,7 +128,34 @@ jobs:
           TMP: ${{ runner.temp }}
         run: powershell -ExecutionPolicy Bypass -File tools/smoke_test_exe.ps1 -Exe publish/PhotoShelver.exe
 
-      - if: ${{ !inputs.for-release }}
+      # How the app looks on this Windows: a demo card and library (drawn pictures), in the light and the dark theme.
+      - name: Screenshots
+        if: ${{ !cancelled() && !inputs.for-release }}
+        env:
+          TEMP: ${{ runner.temp }}
+          TMP: ${{ runner.temp }}
+        run: |
+          [Environment]::OSVersion.VersionString
+          "Segoe Fluent Icons installed: $(Test-Path "$env:WINDIR\Fonts\SegoeIcons.ttf")"
+          python -m pip install --quiet pillow
+          python tools/make_demo_library.py "${{ runner.temp }}/demo"
+          foreach ($theme in 'Light', 'Dark') {
+            powershell -ExecutionPolicy Bypass -File tools/screenshot_exe.ps1 -Exe publish/PhotoShelver.exe `
+              -Demo "${{ runner.temp }}/demo" -Out "screenshots/$theme.png" -Theme $theme
+            if ($LASTEXITCODE -ne 0) { throw "screenshot $theme failed" }
+          }
+
+      - name: Upload the screenshots
+        if: ${{ !cancelled() && !inputs.for-release }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: screenshots-${{ matrix.os }}
+          path: screenshots
+          retention-days: 14
+          if-no-files-found: ignore
+
+      # The exe is the same on every Windows: kept once.
+      - if: ${{ !inputs.for-release && matrix.os == 'windows-2025' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: PhotoShelver-${{ github.sha }}
