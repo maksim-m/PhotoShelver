@@ -1,6 +1,6 @@
 <#
 Runs the tests inside Windows Sandbox: a disposable virtual machine with its own desktop, discarded when it closes.
-  - The sandbox sees only src\, tests\ (with the build output) and the .NET installation, all read-only. The rest of
+  - The sandbox sees only src\, tests\ (with the build output), tools\ and the .NET installation, all read-only. The rest of
     this computer, including any real photos, is not visible to it; networking is off.
   - The UI tests move the mouse and click inside the sandbox's own desktop: you can keep working meanwhile.
     The sandbox window is put behind your windows (and restored if minimized: the tests are unreliable while it is
@@ -66,26 +66,12 @@ if (__UI__) {
     & dotnet test "C:\PS\repo\tests\PhotoShelver.UiTests\bin\Debug\net10.0-windows\PhotoShelver.UiTests.dll" --blame-hang-timeout 5m --logger "console;verbosity=normal" *> "C:\PS\io\ui.txt"
 }
 if (__VOLUMES__) {
-    # Two exFAT virtual disks on the sandbox's own disk (diskpart: the storage cmdlets are not available here).
+    # Two exFAT virtual disks on the sandbox's own disk (the same script as in CI).
     $log = "C:\PS\io\volumes.txt"
-    function Run-DiskPart([string[]]$lines) {
-        $lines | Set-Content C:\dp.txt -Encoding ascii
-        & diskpart.exe /s C:\dp.txt 2>&1 | Out-String
-    }
     try {
-        foreach ($v in @(@{ File = "C:\pi_rw.vhdx"; Label = "PI_RW"; Letter = "X" }, @{ File = "C:\pi_ro.vhdx"; Label = "PI_RO"; Letter = "Y" })) {
-            Run-DiskPart @("create vdisk file=`"$($v.File)`" maximum=256 type=expandable", "select vdisk file=`"$($v.File)`"", "attach vdisk",
-                "create partition primary", "format fs=exfat label=$($v.Label) quick", "assign letter=$($v.Letter)") | Out-Null
-            if (-not (Test-Path "$($v.Letter):\")) { throw "virtual disk $($v.Label) did not get the letter $($v.Letter)" }
-        }
-        Copy-Item "C:\PS\repo\tests\PhotoShelver.Core.Tests\Fixtures\media" "Y:\card" -Recurse
-        # The write-protected card: the same disk attached read-only.
-        Run-DiskPart @("select vdisk file=`"C:\pi_ro.vhdx`"", "detach vdisk", "attach vdisk readonly") | Out-Null
-        for ($i = 0; $i -lt 20 -and -not (Test-Path "Y:\card"); $i++) { Start-Sleep -Milliseconds 500 }
-        if (-not (Test-Path "Y:\card")) { throw "the read-only disk is not back as Y:" }
-        $wrote = $true; try { "x" | Set-Content "Y:\probe.txt" -ErrorAction Stop } catch { $wrote = $false }
-        if ($wrote) { throw "the read-only test disk accepted a write" }
-        "volumes ready: X: exFAT writable, Y: exFAT read-only" | Set-Content $log
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\PS\repo\tools\create_test_volumes.ps1" `
+            -Fixtures "C:\PS\repo\tests\PhotoShelver.Core.Tests\Fixtures\media" -Folder "C:\PS\volumes" *> $log
+        if ($LASTEXITCODE -ne 0) { throw (Get-Content $log -Raw) }
         $env:PHOTOSHELVER_TEST_VOLUME = "X:\"
         $env:PHOTOSHELVER_TEST_READONLY_VOLUME = "Y:\"
         # Separate files: appending a test run's output to the log would mix two text encodings in one file.
@@ -116,6 +102,7 @@ $config = @"
   <MappedFolders>
 $(Mapped (Join-Path $Repo "src") "C:\PS\repo\src" $true)
 $(Mapped (Join-Path $Repo "tests") "C:\PS\repo\tests" $true)
+$(Mapped (Join-Path $Repo "tools") "C:\PS\repo\tools" $true)
 $(Mapped $DotnetRoot "C:\PS\dotnet" $true)
 $(Mapped $Io "C:\PS\io" $false)
   </MappedFolders>

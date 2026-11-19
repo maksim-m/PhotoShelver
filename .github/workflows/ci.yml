@@ -1,7 +1,7 @@
 # Every push to main and every pull request: build with warnings as errors, the core tests, the UI tests (the real
 # window, driven through UI Automation), the published exe started once (smoke test) and kept as a downloadable
 # artifact. Also run by release.yml before a release is made.
-# Not here: the tests on exFAT volumes (they need Windows Sandbox: tools/run_tests_sandbox.ps1) and the mutation check
+# Also the tests on exFAT volumes (virtual disks created on the runner). Not here: the mutation check
 # (long; see mutation.yml).
 name: CI
 
@@ -67,6 +67,38 @@ jobs:
         run: >
           dotnet test tests/PhotoShelver.UiTests --no-build -c Debug --blame-hang-timeout 5m
           --logger "console;verbosity=normal" --logger trx --results-directory TestResults/ui
+
+      # Like SD cards: two exFAT virtual disks, one write-protected. The runner is a disposable VM with administrator
+      # rights, as Windows Sandbox is locally (tools/run_tests_sandbox.ps1 uses the same script).
+      - name: Test volumes (exFAT, one write-protected)
+        id: volumes
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: >
+          powershell -ExecutionPolicy Bypass -File tools/create_test_volumes.ps1
+          -Fixtures tests/PhotoShelver.Core.Tests/Fixtures/media -Folder "${{ runner.temp }}/volumes"
+
+      - name: Volume tests (core)
+        if: ${{ !cancelled() && steps.volumes.outcome == 'success' }}
+        env:
+          PHOTOSHELVER_TEST_VOLUME: 'X:\'
+          PHOTOSHELVER_TEST_READONLY_VOLUME: 'Y:\'
+          TEMP: ${{ runner.temp }}
+          TMP: ${{ runner.temp }}
+        run: >
+          dotnet test tests/PhotoShelver.Core.Tests --no-build -c Debug --filter "Category=RealVolume" --blame-hang-timeout 5m
+          --logger "console;verbosity=normal" --logger trx --results-directory TestResults/volumes-core
+
+      - name: Volume tests (UI)
+        if: ${{ !cancelled() && steps.volumes.outcome == 'success' }}
+        env:
+          PHOTOSHELVER_UI_TESTS: "1"
+          PHOTOSHELVER_TEST_VOLUME: 'X:\'
+          PHOTOSHELVER_TEST_READONLY_VOLUME: 'Y:\'
+          TEMP: ${{ runner.temp }}
+          TMP: ${{ runner.temp }}
+        run: >
+          dotnet test tests/PhotoShelver.UiTests --no-build -c Debug --filter "Category=RealVolumeUi" --blame-hang-timeout 5m
+          --logger "console;verbosity=normal" --logger trx --results-directory TestResults/volumes-ui
 
       - name: Test results and UI screenshots
         if: ${{ failure() }}
