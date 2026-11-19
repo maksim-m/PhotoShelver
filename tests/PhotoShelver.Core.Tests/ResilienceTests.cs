@@ -10,10 +10,19 @@ public class ResilienceTests
     private static readonly TimeSpan[] Fast = [TimeSpan.FromMilliseconds(10), TimeSpan.FromMilliseconds(10)];
 
     /// <summary>Holds a file open without delete sharing (like an antivirus scan) and releases it after a while.</summary>
+    /// <remarks>
+    /// Released by a thread of its own, not by a thread-pool timer: with other tests running in parallel on a machine
+    /// with few cores (CI), the pool can be busy for seconds, the lock then outlasts the importer's ~3.5 s of retries
+    /// and the test fails although the importer did everything right.
+    /// </remarks>
     private static void LockBriefly(string path, int milliseconds)
     {
         var handle = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
-        _ = Task.Delay(milliseconds).ContinueWith(_ => handle.Dispose());
+        new Thread(() =>
+        {
+            Thread.Sleep(milliseconds);
+            handle.Dispose();
+        }) { IsBackground = true, Name = "brief lock" }.Start();
     }
 
     [Theory]
