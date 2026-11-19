@@ -118,6 +118,30 @@ public class FormatCoverageTests
     }
 
     [Fact]
+    public void AQuickTimeFileStartingWithAKnownFirstBoxIsDatedWhateverComesBeforeMoov()
+    {
+        // Starts with 'wide' (old QuickTime), then a box whose type is not readable text (vendor padding), then the
+        // usual content. The known first box decides: the whole chain is not checked, so the date is still read.
+        using var dir = new TempDir();
+        var original = Path.Combine(Fixtures.MediaRoot, "video", "VID_apple.MOV");
+        var bytes = File.ReadAllBytes(original);
+        var ftypSize = (int)BinaryPrimitives.ReadUInt32BigEndian(bytes);
+        var wide = new byte[8];
+        BinaryPrimitives.WriteUInt32BigEndian(wide, 8);
+        "wide"u8.CopyTo(wide.AsSpan(4));
+        var padding = new byte[16];
+        BinaryPrimitives.WriteUInt32BigEndian(padding, 16);
+        padding[4] = 0x01; padding[5] = 0x02; padding[6] = 0x03; padding[7] = 0x04;
+        var path = Path.Combine(dir.Path, "MVI_0001.MOV");
+        File.WriteAllBytes(path, [.. wide, .. padding, .. bytes[ftypSize..]]);
+        var reader = new CaptureDateReader(Fixtures.Berlin);
+
+        var expected = reader.Read(original, MediaKind.Video, FileTime);
+        Assert.Equal(DateSource.Metadata, expected.Source);
+        Assert.Equal(expected, reader.Read(path, MediaKind.Video, FileTime));
+    }
+
+    [Fact]
     public void AQuickTimeFileStartingWithAnotherBoxIsDatedToo()
     {
         // Not one of the usual first boxes, but a well-formed chain that contains 'moov'.
