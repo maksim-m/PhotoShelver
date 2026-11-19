@@ -8,6 +8,9 @@ Usage (from anywhere):
   python tools/mutation_check.py        core mutations, checked by the core tests
   python tools/mutation_check.py --ui   UI mutations, checked by the UI tests (opens app windows)
   python tools/mutation_check.py --only=TIFF --only=stack   only the mutations whose name contains one of these
+  python tools/mutation_check.py --changed-since=v1.2.0     only those a change since that commit can affect
+  python tools/mutation_check.py --shard=1/4                the second of four parts (parallel runs)
+  python tools/mutation_check.py --plan [--changed-since=..] [--shard-size=12]   the parts as JSON (CI matrix)
 Exit code: 0 if every mutation was caught, 1 otherwise.
 
 When code changes so that a snippet below no longer exists, the script stops with an error -
@@ -414,16 +417,82 @@ def restore_interrupted_run():
     print(f"restored {saved['path']} from an interrupted run", flush=True)
 
 
-def main():
-    restore_interrupted_run()
-    dotnet = find_dotnet()
-    ui = "--ui" in sys.argv
+def option(name):
+    """The value of --name=value (the last one given), or None."""
+    values = [a[len(name) + 3:] for a in sys.argv if a.startswith(f"--{name}=")]
+    return values[-1] if values else None
+
+
+def changed_files(since):
+    """Files changed between the commit `since` and the working tree (repo-relative, with "/")."""
+    proc = subprocess.run(["git", "diff", "--name-only", since], cwd=REPO, capture_output=True, text=True)
+    if proc.returncode != 0:
+        sys.exit(f"git diff {since} failed: {proc.stderr.strip()}")
+    return {line.strip() for line in proc.stdout.splitlines() if line.strip()}
+
+
+def select(ui, changed):
+    """
+    The mutations of one suite that a change can affect (all of them when `changed` is None).
+    A mutation is affected when its own file changed. Every mutation of the suite is, when its tests (or their test
+    files) changed, or this script: a test that no longer catches a mutation can be anywhere in the suite.
+    """
     mutations = UI_MUTATIONS if ui else MUTATIONS
+    if changed is None:
+        return list(mutations)
+    tests = (UI_TESTS if ui else TESTS).replace("\\", "/") + "/"
+    if "tools/mutation_check.py" in changed or any(f.startswith(tests) for f in changed):
+        return list(mutations)
+    return [m for m in mutations if m[1].replace("\\", "/") in changed]
+
+
+def shard_of(mutations, shard):
+    """Part i of n ("i/n", from 0): every n-th mutation, so that slow and fast ones spread evenly."""
+    i, n = (int(x) for x in shard.split("/"))
+    if not 0 <= i < n:
+        sys.exit(f"--shard={shard}: expected i/n with 0 <= i < n")
+    return mutations[i::n]
+
+
+def only_filter(mutations, only):
+    """The mutations whose name contains one of the --only texts (all when none are given)."""
+    return [m for m in mutations if any(o.lower() in m[0].lower() for o in only)] if only else mutations
+
+
+def plan(changed, shard_size, only):
+    """
+    Prints the parts for parallel runs as JSON, e.g. {"count": 23, "include": [{"suite": "core", "shard": "0/2"}, ...]}
+    (the CI matrix). Needs neither .NET nor a build.
+    """
+    include = []
+    count = 0
+    for suite, ui in (("core", False), ("ui", True)):
+        selected = only_filter(select(ui, changed), only)
+        count += len(selected)
+        parts = (len(selected) + shard_size - 1) // shard_size
+        include += [{"suite": suite, "shard": f"{i}/{parts}"} for i in range(parts)]
+    print(json.dumps({"count": count, "include": include}))
+
+
+def main():
+    since = option("changed-since")
+    changed = changed_files(since) if since else None
     only = [a[len("--only="):] for a in sys.argv if a.startswith("--only=")]
-    if only:
-        mutations = [m for m in mutations if any(o.lower() in m[0].lower() for o in only)]
-        if not mutations:
-            sys.exit(f"No mutation matches {only}")
+    if "--plan" in sys.argv:
+        plan(changed, int(option("shard-size") or "12"), only)
+        return 0
+
+    restore_interrupted_run()
+    ui = "--ui" in sys.argv
+    mutations = only_filter(select(ui, changed), only)
+    if only and not mutations and not since:
+        sys.exit(f"No mutation matches {only}")
+    if option("shard"):
+        mutations = shard_of(mutations, option("shard"))
+    if not mutations:
+        print("No mutation to check" + (f" (nothing they cover changed since {since})" if since else ""))
+        return 0
+    dotnet = find_dotnet()
 
     def run():
         return run_tests(dotnet, ui)

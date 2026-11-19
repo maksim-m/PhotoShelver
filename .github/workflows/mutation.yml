@@ -1,14 +1,26 @@
-# The mutation check of the core tests (tools/mutation_check.py): breaks safety-critical code on purpose, one place
-# at a time, and fails if the tests do not notice. Long (one test run per mutation), so only started by hand:
-# Actions > Mutation check > Run workflow. "only" limits it to mutations whose name contains that text.
+# The mutation check (tools/mutation_check.py): breaks safety-critical code on purpose, one place at a time, and fails
+# if the tests do not notice. One full test run per mutation, so:
+#   - release.yml runs it before every release, only for the mutations a change since the last release can affect
+#     (their file changed, or their tests, or the mutation list);
+#   - by hand (Actions > Mutation check > Run workflow) all of them, or a part.
+# The mutations are split into parts that run in parallel; the plan is made on Linux (no .NET needed, cheaper minutes).
 name: Mutation check
 
 on:
   workflow_dispatch:
     inputs:
-      only:
-        description: "Only mutations whose name contains this text (empty: all)"
+      changed-since:
+        description: "Only mutations a change since this tag or commit can affect (empty: all)"
         required: false
+        default: ""
+      only:
+        description: "Only mutations whose name contains this text (empty: no filter)"
+        required: false
+        default: ""
+  workflow_call:
+    inputs:
+      changed-since:
+        type: string
         default: ""
 
 permissions:
@@ -19,13 +31,46 @@ env:
   DOTNET_CLI_TELEMETRY_OPTOUT: "true"
 
 jobs:
-  mutations:
-    runs-on: windows-2025
-    timeout-minutes: 300
+  plan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      count: ${{ steps.plan.outputs.count }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0 # the commit to compare with
+
+      - name: Which mutations, in how many parts
+        id: plan
+        env:
+          SINCE: ${{ inputs.changed-since }}
+          ONLY: ${{ inputs.only }}
+        run: |
+          args=(--plan --shard-size=12)
+          if [ -n "$SINCE" ]; then args+=("--changed-since=$SINCE"); fi
+          if [ -n "$ONLY" ]; then args+=("--only=$ONLY"); fi
+          plan=$(python3 tools/mutation_check.py "${args[@]}")
+          echo "$plan"
+          echo "matrix=$(echo "$plan" | python3 -c 'import json,sys; print(json.dumps({"include": json.load(sys.stdin)["include"]}))')" >> "$GITHUB_OUTPUT"
+          echo "count=$(echo "$plan" | python3 -c 'import json,sys; print(json.load(sys.stdin)["count"])')" >> "$GITHUB_OUTPUT"
+
+  mutations:
+    needs: plan
+    if: ${{ needs.plan.outputs.count != '0' }}
+    name: ${{ matrix.suite }} ${{ matrix.shard }}
+    runs-on: windows-2025
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false # every part reports its own mutations
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
 
       - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
@@ -35,11 +80,18 @@ jobs:
         run: dotnet restore --locked-mode
 
       - name: Mutation check
+        shell: pwsh
         env:
+          SUITE: ${{ matrix.suite }}
+          SHARD: ${{ matrix.shard }}
+          SINCE: ${{ inputs.changed-since }}
           ONLY: ${{ inputs.only }}
           TEMP: ${{ runner.temp }}
           TMP: ${{ runner.temp }}
-        shell: pwsh
         run: |
-          if ($env:ONLY) { python tools/mutation_check.py "--only=$env:ONLY" } else { python tools/mutation_check.py }
+          $arguments = @("tools/mutation_check.py", "--shard=$env:SHARD")
+          if ($env:SUITE -eq "ui") { $arguments += "--ui" }
+          if ($env:SINCE) { $arguments += "--changed-since=$env:SINCE" }
+          if ($env:ONLY) { $arguments += "--only=$env:ONLY" }
+          python @arguments
           exit $LASTEXITCODE

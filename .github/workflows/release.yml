@@ -1,6 +1,7 @@
 # A release from a version tag:
 #   git tag v1.2.0 && git push origin v1.2.0          (a pre-release: v1.3.0-beta.1)
-# 1. All CI checks (ci.yml): build, core tests, UI tests.
+# 1. All CI checks (ci.yml): build, core, UI and volume tests. At the same time the mutation check (mutation.yml) of
+#    whatever changed since the last release: a mutation the tests no longer catch stops the release.
 # 2. The exe is built with the tag's version, started once (smoke test), and its SHA-256 written next to it.
 # 3. A GitHub Release with the exe and SHA256SUMS.txt; the notes are generated from the commits since the last release.
 # Only tags on main are released. The exe is not signed (yet): Windows SmartScreen warns when a downloaded copy is
@@ -29,8 +30,43 @@ jobs:
     with:
       for-release: true
 
+  # The last published release before this one: the mutation check covers what changed since then. That release
+  # passed its own check; with none before (the first release), all mutations run.
+  previous:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      tag: ${{ steps.previous.outputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Last published release on this line
+        id: previous
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          # Published releases only (a tag whose release failed was never checked), newest first, and only one whose
+          # commit this tag contains.
+          previous=""
+          for tag in $(gh release list --exclude-drafts --limit 100 --json tagName,createdAt \
+                         --jq 'sort_by(.createdAt) | reverse | .[].tagName'); do
+            if [ "$tag" != "$TAG" ] && git merge-base --is-ancestor "$tag" HEAD 2>/dev/null; then previous="$tag"; break; fi
+          done
+          echo "previous release: ${previous:-none (all mutations run)}"
+          echo "tag=$previous" >> "$GITHUB_OUTPUT"
+
+  mutations:
+    needs: previous
+    uses: ./.github/workflows/mutation.yml
+    with:
+      changed-since: ${{ needs.previous.outputs.tag }}
+
   release:
-    needs: checks
+    needs: [checks, mutations]
     runs-on: windows-2025
     timeout-minutes: 30
     permissions:
