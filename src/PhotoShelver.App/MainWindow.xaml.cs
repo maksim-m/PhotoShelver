@@ -19,6 +19,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        DarkTitleBar.Attach(this);
         _settings = SettingsStore.Load();
         // A hand-edited or damaged settings file must not stop the window from opening (WPF throws on NaN or negative sizes).
         Width = SaneSize(_settings.WindowWidth, MinWidth, 1280);

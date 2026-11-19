@@ -25,7 +25,7 @@ using System.Runtime.InteropServices;
 public static class Win {
     [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left, Top, Right, Bottom; }
     [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hwnd, out RECT rect);
-    [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr hwnd, IntPtr hdc, uint flags);
+    [DllImport("dwmapi.dll")] public static extern int DwmGetWindowAttribute(IntPtr hwnd, int attribute, out RECT rect, int size);
     [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hwnd);
     [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
 }
@@ -58,17 +58,18 @@ try {
         Start-Sleep -Milliseconds 500
     }
     if ($process.MainWindowTitle -ne "PhotoShelver") { throw "no main window within $TimeoutSeconds s" }
-    [Win]::SetForegroundWindow($process.MainWindowHandle) | Out-Null
     Start-Sleep -Seconds 8 # scan, thumbnails, folder tree
+    [Win]::SetForegroundWindow($process.MainWindowHandle) | Out-Null # in front: the screenshot is taken from the screen
+    Start-Sleep -Milliseconds 500
 
     $hwnd = $process.MainWindowHandle
+    # What is really on the screen (the title bar exactly as Windows draws it), within the visible frame of the window
+    # (DWMWA_EXTENDED_FRAME_BOUNDS: without the invisible resize border around it).
     $r = New-Object Win+RECT
-    [Win]::GetWindowRect($hwnd, [ref]$r) | Out-Null
+    if ([Win]::DwmGetWindowAttribute($hwnd, 9, [ref]$r, 16) -ne 0) { [Win]::GetWindowRect($hwnd, [ref]$r) | Out-Null }
     $bitmap = New-Object System.Drawing.Bitmap ($r.Right - $r.Left), ($r.Bottom - $r.Top)
     $g = [System.Drawing.Graphics]::FromImage($bitmap)
-    $hdc = $g.GetHdc()
-    [Win]::PrintWindow($hwnd, $hdc, 2) | Out-Null # PW_RENDERFULLCONTENT: also what DirectX draws (WPF)
-    $g.ReleaseHdc($hdc)
+    $g.CopyFromScreen($r.Left, $r.Top, 0, 0, $bitmap.Size)
     $g.Dispose()
     New-Item -ItemType Directory -Force (Split-Path $Out) | Out-Null
     $bitmap.Save($Out, [System.Drawing.Imaging.ImageFormat]::Png)

@@ -13,6 +13,7 @@ public partial class ImportSummaryWindow : Window
     public ImportSummaryWindow(ImportFinishedInfo info)
     {
         InitializeComponent();
+        PhotoShelver.App.Services.DarkTitleBar.Attach(this);
         var result = info.Result;
         _targetFolder = info.TargetFolder;
         _logPath = info.LogPath;
