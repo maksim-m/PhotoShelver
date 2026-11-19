@@ -4,6 +4,8 @@
 
 A small, focused Windows 11 app in the spirit of Lightroom's Import dialog, without the catalog: your library stays plain folders that any program can read.
 
+**[⬇ Download the latest version](https://github.com/maksim-m/PhotoShelver/releases/latest)** · Windows 11 (x64) · free and open source (MIT)
+
 ![PhotoShelver: the source on the left, the target folder tree on the right](docs/screenshot.png)
 
 ## Why
@@ -25,7 +27,7 @@ PhotoShelver does one job:
 - **Optional renaming.** Under *Advanced*: a file name template such as `{YYYY}-{MM}-{DD}_{NAME}` → `2026-08-14_IMG_2041.JPG` (date, time `{HH}{mm}{ss}`, original name `{NAME}`). Off by default; when on, it stays visible even with the section collapsed.
 - **Camera and phone formats.** JPEG, HEIC/HEIF (also Fujifilm .HIF), AVIF, JPEG XL, WebP, PNG, TIFF; RAW of every major maker (CR2, CR3, CRW, NEF, NRW, ARW, SR2, RAF, ORF, RW2, PEF, SRW, DNG, GPR, 3FR, IIQ and more); video MP4, MOV, 3GP, AVI, AVCHD (MTS/M2TS), MPG/MOD/TOD, MKV, Insta360 (.insv), GoPro MAX (.360), Canon CRM, MXF, BRAW, R3D. Camera proxies (GoPro .LRV/.THM, DJI .LRF) are left alone.
 - **RAW-friendly.** RAW thumbnails come from the preview the camera embedded — fast and without installing codecs. TIFF scans are shown upright.
-- **Fast on big cards.** Thousands of files are scanned in seconds; thumbnails load for what is on screen first.
+- **Fast on big cards.** Thousands of files are scanned in seconds; thumbnails load for what is on screen first. Disks are checked in the background, so a slow or sleeping one does not freeze the window.
 - **Native look.** Windows 11 Fluent design, light and dark theme, English and Russian interface (follows the Windows display language).
 - **One file, nothing to install.** A self-contained `PhotoShelver.exe`; the .NET runtime is inside.
 
@@ -39,46 +41,81 @@ Your photos are irreplaceable, so the importer is built around a few hard rules:
 - **Files are copied under a temporary name** (`*.importing`) and get their real name only when complete, so an interrupted import never leaves a half-written photo looking like a real one.
 - **Every import is logged** — which file went where, with its hash — in `%LOCALAPPDATA%\PhotoShelver\logs`.
 
-These rules are enforced by tests that inject failures (full disk, card removed mid-copy, file changing while it is copied, bit rot after writing, sharing violations), by tests on real exFAT volumes, by end-to-end UI tests, and by a mutation check that deliberately breaks each safety rule and makes sure some test notices.
+These rules are enforced by tests that inject failures (full disk, card removed mid-copy, file changing while it is copied, bit rot after writing, sharing violations), by tests on real exFAT volumes, by end-to-end UI tests, and by a mutation check that deliberately breaks each safety rule and makes sure some test notices. The tests run on every change, the mutation check before every release.
 
-## Getting it
+## Download and run
 
-Requires Windows 11 (x64). Build it with the [.NET 10 SDK](https://dotnet.microsoft.com/download):
+1. Download **`PhotoShelver.exe`** from the [latest release](https://github.com/maksim-m/PhotoShelver/releases/latest) (about 70 MB).
+2. Put it anywhere (e.g. `C:\Tools\PhotoShelver.exe`) and double-click it. Nothing is installed; the .NET runtime is inside the file. Requires Windows 11 (x64).
+3. **The first start shows "Windows protected your PC"** (SmartScreen): the exe is not code-signed yet. Click **More info → Run anyway**. Windows remembers this for that file.
 
-```powershell
-dotnet publish src/PhotoShelver.App -c Release -o publish
-```
+Optional: check that the download is intact — the release also has `SHA256SUMS.txt`; in PowerShell `Get-FileHash .\PhotoShelver.exe` must show the same value.
 
-This produces a single `publish\PhotoShelver.exe` (~66 MB, runtime included) that runs without installing anything.
+**Updating:** download the new `PhotoShelver.exe` and replace the old one; settings are kept.
 
-Settings (last folders, template, mode) are kept in `%LOCALAPPDATA%\PhotoShelver\settings.json`.
+**Where things are kept:** settings (last folders, templates, mode) in `%LOCALAPPDATA%\PhotoShelver\settings.json`, import logs in `%LOCALAPPDATA%\PhotoShelver\logs`, unexpected errors in `%LOCALAPPDATA%\PhotoShelver\errors.log`. **Removing it:** delete the exe and that folder.
 
-## Development
+**Problems or ideas:** [open an issue](https://github.com/maksim-m/PhotoShelver/issues); for an error, attach `errors.log` (and the import log, if it happened during an import).
+
+## License
+
+PhotoShelver is free software under the [MIT License](LICENSE): use, change and share it freely. It comes without any warranty — keep backups of photos that matter. It includes [third-party components](THIRD-PARTY-NOTICES.md) under their own (permissive) licenses.
+
+---
+
+# For developers
+
+Everything below is about building, testing and releasing PhotoShelver.
+
+## Setup
+
+- Windows 11 (x64).
+- [.NET SDK](https://dotnet.microsoft.com/download) — the exact version in `global.json` (currently 10.0.403).
+- Optional: Python 3 for the tools (mutation check, fixtures, icon, demo library; the generators also need Pillow); the Windows feature "Windows Sandbox" for the sandboxed test run.
 
 ```powershell
 dotnet build
 dotnet test                       # core tests (xUnit)
 dotnet run --project src/PhotoShelver.App
+dotnet publish src/PhotoShelver.App -c Release -o publish   # the single-file exe, publish\PhotoShelver.exe
 ```
 
-- **UI tests** — real window, real mouse; about a minute, don't touch the mouse meanwhile:
-  `powershell -ExecutionPolicy Bypass -File tools/run_ui_tests.ps1`
-- **All tests in Windows Sandbox** — a disposable virtual machine that sees only `src`, `tests` and .NET (read-only, no network): nothing on this computer can be touched, and the UI tests use the sandbox's own mouse, so you can keep working (~10 min). It also runs the tests on real exFAT volumes: two virtual disks created and formatted inside the sandbox (one write-protected, like a locked SD card) — on its own disposable disk, without administrator rights here. Needs the Windows feature "Windows Sandbox":
-  `powershell -ExecutionPolicy Bypass -File tools/run_tests_sandbox.ps1` (`-UiOnly`, `-CoreOnly`, `-VolumesOnly`)
-- **Test safety** — every test works in its own folder under `%TEMP%\PhotoShelverTests`, which refuses paths outside itself; the UI tests refuse to start the app unless every folder it gets is such a test folder.
-- **A real card or USB disk** — set `PHOTOSHELVER_TEST_VOLUME` (see the header of `RealVolumeTests.cs`) and run `dotnet test --filter Category=RealVolume`.
-- **Mutation check** — breaks each safety rule in turn and expects a failing test: `python tools/mutation_check.py` (add `--ui` for the interface).
-- **CI** (GitHub Actions, `.github/workflows/ci.yml`): every push to `main` and every pull request is built, the core and UI tests run, and so do the exFAT volume tests (two virtual disks created on the runner, one write-protected — the runner is a disposable VM with administrator rights, like Windows Sandbox locally; `tools/create_test_volumes.ps1` serves both); the exe is started once and is attached to the run as an artifact (kept 14 days). The mutation check (`mutation.yml`) is too long for every push (one full test run per mutation): it runs before each release for what changed since the last one (see below), and by hand in full (Actions → Mutation check → Run workflow), split into parts that run in parallel.
-- **Releases** (`release.yml`): push a version tag from `main` — `git tag v1.2.0 && git push origin v1.2.0` (a pre-release: `v1.3.0-beta.1`). All CI checks run, and the mutation check of the mutations a change since the last release can affect (their file, their tests or the mutation list changed); a mutation the tests no longer catch stops the release. Then the exe is built with that version, started once, and published as a GitHub Release together with `SHA256SUMS.txt`. Local builds are version `0.0.0-dev`. The exe is not signed yet: SmartScreen warns when a downloaded copy is first started.
-- **Build rules**: warnings are errors; the .NET SDK is pinned exactly in `global.json` (the SDK brings some packages of its own version, which are in the lock files too; to move to a newer SDK, change the version there and run `dotnet restore --force-evaluate`); NuGet packages are locked in `packages.lock.json` (CI restores with `--locked-mode`). After changing a package: `dotnet restore --force-evaluate` and commit the updated lock files.
-- **Test files** are synthetic (`tests/PhotoShelver.Core.Tests/Fixtures`, generated by `generate_fixtures.py`); format replicas of camera and phone files use the real structure with invented values.
-- **Language**: Windows' display language decides when there is a translation for it, English otherwise; `PHOTOSHELVER_LANG=ru|en` overrides it. The texts are in `src/PhotoShelver.Core/Strings.resx` (English) and `Strings.ru.resx` (Russian).
-- **Adding a language**: copy `Strings.resx` to `Strings.<language code>.resx` (e.g. `Strings.de.resx`) and translate the values — nothing else to change. Keep `{0}`, `{1}`… and the tokens in braces (`{NAME}`, `{YYYY}`…) as they are; `FileOne` / `FileFew` / `FileMany` are the plural forms of “file”. A test checks that every text exists in every language with the same `{0}`, `{1}`….
-- **Screenshot**: the demo card and library are drawn by `python tools/make_demo_library.py <empty folder>`.
+Local builds are version `0.0.0-dev`; releases get theirs from the tag (see [Releases](#ci-and-releases)).
 
-### Layout
+## Layout
 
-- `src/PhotoShelver.Core` — everything without UI: scanning, capture dates, hashing, duplicates, folder tree, import.
+- `src/PhotoShelver.Core` — everything without UI: scanning, capture dates, hashing, duplicates, folder tree, import and its pre-checks.
 - `src/PhotoShelver.App` — the WPF app.
-- `tests/` — core tests and UI tests.
-- `tools/` — test runners, mutation check, icon and demo generators.
+- `tests/PhotoShelver.Core.Tests` — core tests; `tests/PhotoShelver.UiTests` — end-to-end UI tests.
+- `tools/` — test runners, mutation check, test volumes, smoke test, icon and demo generators.
+- `.github/workflows/` — CI, releases, mutation check.
+
+## Tests
+
+- **Core tests** — `dotnet test`. Every test works in its own folder under `%TEMP%\PhotoShelverTests`, which refuses paths outside itself.
+- **UI tests** — the real window, driven through UI Automation and the real mouse; about a minute, don't touch the mouse meanwhile:
+  `powershell -ExecutionPolicy Bypass -File tools/run_ui_tests.ps1`. They refuse to start the app unless every folder it gets (source, target, second copy, settings) is such a test folder; plain `dotnet test` skips them.
+- **All tests in Windows Sandbox** — a disposable virtual machine that sees only `src`, `tests`, `tools` and .NET (read-only, no network): nothing on this computer can be touched, and the UI tests use the sandbox's own mouse, so you can keep working (~10 min). It also runs the tests on real exFAT volumes: two virtual disks created and formatted inside the sandbox (one write-protected, like a locked SD card), without administrator rights here:
+  `powershell -ExecutionPolicy Bypass -File tools/run_tests_sandbox.ps1` (`-UiOnly`, `-CoreOnly`, `-VolumesOnly`)
+- **A real card or USB disk** — set `PHOTOSHELVER_TEST_VOLUME` (see the header of `RealVolumeTests.cs`) and run `dotnet test --filter Category=RealVolume`.
+- **Mutation check** — breaks each safety rule in turn and expects a failing test: `python tools/mutation_check.py` (`--ui` for the interface, `--only=<text>`, `--changed-since=<tag>`, `--shard=i/n`). A mutation no test notices is a gap in the tests; a snippet that no longer exists in the code stops the script (update it together with the code).
+- **Smoke test of a published exe** — `powershell -ExecutionPolicy Bypass -File tools/smoke_test_exe.ps1 -Exe publish\PhotoShelver.exe`.
+- **Test files** are synthetic (`tests/PhotoShelver.Core.Tests/Fixtures`, generated by `generate_fixtures.py`); format replicas of camera and phone files use the real structure with invented values. Real photos are never committed.
+
+## CI and releases
+
+- **CI** (`.github/workflows/ci.yml`) on every push to `main` and every pull request: build, core tests, UI tests, the exFAT volume tests (two virtual disks created on the runner, one write-protected — the runner is a disposable VM with administrator rights, like Windows Sandbox locally; `tools/create_test_volumes.ps1` serves both), and the published exe started once; the exe is attached to the run as an artifact (kept 14 days).
+- **Mutation check** (`mutation.yml`): too long for every push (one full test run per mutation), so it runs before each release for what changed since the last one, and by hand in full (Actions → Mutation check → Run workflow). The plan is made on Linux; the parts run in parallel on Windows.
+- **Releases** (`release.yml`): push a version tag from `main` — `git tag v1.2.0 && git push origin v1.2.0` (a pre-release: `v1.3.0-beta.1`). All CI checks run, together with the mutation check of the mutations a change since the last release can affect (their file, their tests or the mutation list changed); a mutation the tests no longer catch stops the release. Then the exe is built with that version, started once, and published as a GitHub Release with `SHA256SUMS.txt`, `LICENSE` and `THIRD-PARTY-NOTICES.md`. The exe is not code-signed yet.
+- **Build rules**: warnings are errors; the .NET SDK is pinned exactly in `global.json` (the SDK brings some packages of its own version, which are in the lock files too; to move to a newer SDK, change the version there and run `dotnet restore --force-evaluate`); NuGet packages are locked in `packages.lock.json` (CI restores with `--locked-mode`) — after changing a package, run `dotnet restore --force-evaluate` and commit the updated lock files. A new dependency also needs its entry in `THIRD-PARTY-NOTICES.md`.
+
+## Languages
+
+Windows' display language decides when there is a translation for it, English otherwise; `PHOTOSHELVER_LANG=ru|en` overrides it. The texts are in `src/PhotoShelver.Core/Strings.resx` (English) and `Strings.ru.resx` (Russian).
+
+**Adding a language:** copy `Strings.resx` to `Strings.<language code>.resx` (e.g. `Strings.de.resx`) and translate the values — nothing else to change. Keep `{0}`, `{1}`… and the tokens in braces (`{NAME}`, `{YYYY}`…) as they are; `FileOne` / `FileFew` / `FileMany` are the plural forms of “file”. A test checks that every text exists in every language with the same `{0}`, `{1}`….
+
+## Assets
+
+- The icon (`src/PhotoShelver.App/Assets/app.ico`) is drawn by `python tools/make_icon.py`.
+- The screenshots use a demo card and library (drawn landscapes, no real photos) made by `python tools/make_demo_library.py <empty folder>`.

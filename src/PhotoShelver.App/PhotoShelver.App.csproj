@@ -10,6 +10,8 @@
     <NoWarn>$(NoWarn);WPF0001</NoWarn>
     <!-- Local builds are "0.0.0-dev"; releases get their version from the tag (.github/workflows/release.yml). -->
     <Version>0.0.0-dev</Version>
+    <Product>PhotoShelver</Product>
+    <Copyright>Copyright © 2026 Maksim Moiseikin. MIT License.</Copyright>
     <!-- Restored the same way in Debug and Release, so that one lock file (packages.lock.json) serves both: the
          win-x64 runtime, and the single-file setting (it brings the single-file analyzer package). Both only take
          effect on publish. -->
