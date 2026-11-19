@@ -109,6 +109,8 @@
         <!-- Clickable day header: collapses / expands the day -->
         <Style x:Key="GroupHeaderButton" TargetType="Button">
             <Setter Property="Cursor" Value="Hand"/>
+            <!-- Own template: without this the text would be the classic black, unreadable in the dark theme. -->
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}"/>
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -380,7 +382,8 @@
                         <TreeView.ItemTemplate>
                             <HierarchicalDataTemplate DataType="{x:Type vm:FolderNodeViewModel}" ItemsSource="{Binding Children}">
                                 <StackPanel Orientation="Horizontal" ToolTip="{Binding FullPath}">
-                                    <TextBlock Text="&#xE8B7;" FontFamily="{StaticResource IconFont}" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                    <!-- F12B, not E8B7: the same folder in both fonts (E8B7 is an upright page-like folder in Segoe MDL2 Assets) -->
+                                    <TextBlock Text="&#xF12B;" FontFamily="{StaticResource IconFont}" VerticalAlignment="Center" Margin="0,0,6,0"/>
                                     <TextBlock Text="{Binding Name}" VerticalAlignment="Center"/>
                                     <TextBlock Text="{Binding CountText}" FontWeight="SemiBold" Margin="8,0,0,0" VerticalAlignment="Center"
                                                Foreground="{DynamicResource SystemFillColorSuccessBrush}"
