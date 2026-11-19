@@ -47,11 +47,9 @@ $wrote = $true
 try { "x" | Set-Content "${ReadOnlyLetter}:\probe.txt" -ErrorAction Stop } catch { $wrote = $false }
 if ($wrote) { throw "the read-only test disk accepted a write" }
 
-# Not in Windows Sandbox (no storage cmdlets there): diskpart's "format fs=exfat" is trusted then.
-if (Get-Command Get-Volume -ErrorAction SilentlyContinue) {
-    foreach ($letter in @($WritableLetter, $ReadOnlyLetter)) {
-        $fs = (Get-Volume -DriveLetter $letter).FileSystem
-        if ($fs -ne "exFAT") { throw "${letter}: is '$fs', not exFAT" }
-    }
+# Through .NET: the storage cmdlets (Get-Volume) do not see these disks in Windows Sandbox.
+foreach ($letter in @($WritableLetter, $ReadOnlyLetter)) {
+    $fs = ([System.IO.DriveInfo]::new($letter)).DriveFormat
+    if ($fs -ne "exFAT") { throw "${letter}: is '$fs', not exFAT" }
 }
 "volumes ready: ${WritableLetter}: exFAT writable, ${ReadOnlyLetter}: exFAT read-only"
