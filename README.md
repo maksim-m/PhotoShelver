@@ -2,9 +2,9 @@
 
 **Move photos and videos from a memory card or phone into your library, sorted into folders by capture date — without ever losing or overwriting a file.**
 
-A small, focused Windows 11 app in the spirit of Lightroom's Import dialog, without the catalog: your library stays plain folders that any program can read.
+A small, focused Windows app in the spirit of Lightroom's Import dialog, without the catalog: your library stays plain folders that any program can read.
 
-**[⬇ Download the latest version](https://github.com/maksim-m/PhotoShelver/releases/latest)** · Windows 11 (x64) · free and open source (MIT)
+**[⬇ Download the latest version](https://github.com/maksim-m/PhotoShelver/releases/latest)** · Windows 10 and 11 (x64) · free and open source (MIT)
 
 ![PhotoShelver: the source on the left, the target folder tree on the right](docs/screenshot.png)
 
@@ -28,7 +28,7 @@ PhotoShelver does one job:
 - **Camera and phone formats.** JPEG, HEIC/HEIF (also Fujifilm .HIF), AVIF, JPEG XL, WebP, PNG, TIFF; RAW of every major maker (CR2, CR3, CRW, NEF, NRW, ARW, SR2, RAF, ORF, RW2, PEF, SRW, DNG, GPR, 3FR, IIQ and more); video MP4, MOV, 3GP, AVI, AVCHD (MTS/M2TS), MPG/MOD/TOD, MKV, Insta360 (.insv), GoPro MAX (.360), Canon CRM, MXF, BRAW, R3D. Camera proxies (GoPro .LRV/.THM, DJI .LRF) are left alone.
 - **RAW-friendly.** RAW thumbnails come from the preview the camera embedded — fast and without installing codecs. TIFF scans are shown upright.
 - **Fast on big cards.** Thousands of files are scanned in seconds; thumbnails load for what is on screen first. Disks are checked in the background, so a slow or sleeping one does not freeze the window.
-- **Native look.** Windows 11 Fluent design, light and dark theme, English and Russian interface (follows the Windows display language).
+- **Native look.** Windows 11 Fluent design (also on Windows 10), light and dark theme, English and Russian interface (follows the Windows display language).
 - **Private and offline.** PhotoShelver never connects to the internet: no account, no telemetry, no update checks. The time zone of a GPS position is looked up in data built into the app. Settings and import logs stay on your computer.
 - **One file, nothing to install.** A self-contained `PhotoShelver.exe`; the .NET runtime is inside.
 
@@ -47,7 +47,7 @@ These rules are enforced by tests that inject failures (full disk, card removed 
 ## Download and run
 
 1. Download **`PhotoShelver.exe`** from the [latest release](https://github.com/maksim-m/PhotoShelver/releases/latest) (about 70 MB).
-2. Put it anywhere (e.g. `C:\Tools\PhotoShelver.exe`) and double-click it. Nothing is installed; the .NET runtime is inside the file. Requires Windows 11 (x64).
+2. Put it anywhere (e.g. `C:\Tools\PhotoShelver.exe`) and double-click it. Nothing is installed; the .NET runtime is inside the file. Requires Windows 10 (22H2) or Windows 11, x64.
 3. **The first start shows "Windows protected your PC"** (SmartScreen): the exe is not code-signed yet. Click **More info → Run anyway**. Windows remembers this for that file.
 
 Optional: check that the download is intact — the release also has `SHA256SUMS.txt`; in PowerShell `Get-FileHash .\PhotoShelver.exe` must show the same value.
@@ -70,7 +70,7 @@ Everything below is about building, testing and releasing PhotoShelver.
 
 ## Setup
 
-- Windows 11 (x64).
+- Windows 10 or 11 (x64); Windows Sandbox (for the sandboxed test run) needs Windows 11 Pro or Enterprise.
 - [.NET SDK](https://dotnet.microsoft.com/download) — the exact version in `global.json` (currently 10.0.403).
 - Optional: Python 3 for the tools (mutation check, fixtures, icon, demo library; the generators also need Pillow); the Windows feature "Windows Sandbox" for the sandboxed test run.
 
@@ -105,7 +105,7 @@ Local builds are version `0.0.0-dev`; releases get theirs from the tag (see [Rel
 
 ## CI and releases
 
-- **CI** (`.github/workflows/ci.yml`) on every push to `main` and every pull request: build, core tests, UI tests, the exFAT volume tests (two virtual disks created on the runner, one write-protected — the runner is a disposable VM with administrator rights, like Windows Sandbox locally; `tools/create_test_volumes.ps1` serves both), and the published exe started once; the exe is attached to the run as an artifact (kept 14 days).
+- **CI** (`.github/workflows/ci.yml`) on every push to `main` and every pull request, on Windows Server 2025 and 2022 (a Windows before 11, the closest to Windows 10 GitHub has; screenshots of both themes are kept as an artifact): build, core tests, UI tests, the exFAT volume tests (two virtual disks created on the runner, one write-protected — the runner is a disposable VM with administrator rights, like Windows Sandbox locally; `tools/create_test_volumes.ps1` serves both), and the published exe started once; the exe is attached to the run as an artifact (kept 14 days).
 - **Mutation check** (`mutation.yml`): too long for every push (one full test run per mutation), so it runs before each release for what changed since the last one, and by hand in full (Actions → Mutation check → Run workflow). The plan is made on Linux; the parts run in parallel on Windows.
 - **Releases** (`release.yml`): push a version tag from `main` — `git tag v1.2.0 && git push origin v1.2.0` (a pre-release: `v1.3.0-beta.1`). All CI checks run, together with the mutation check of the mutations a change since the last release can affect (their file, their tests or the mutation list changed); a mutation the tests no longer catch stops the release. Then the exe is built with that version, started once, and published as a GitHub Release with `SHA256SUMS.txt`, `LICENSE` and `THIRD-PARTY-NOTICES.md`. The exe is not code-signed yet.
 - **Build rules**: warnings are errors; the .NET SDK is pinned exactly in `global.json` (the SDK brings some packages of its own version, which are in the lock files too; to move to a newer SDK, change the version there and run `dotnet restore --force-evaluate`); NuGet packages are locked in `packages.lock.json` (CI restores with `--locked-mode`) — after changing a package, run `dotnet restore --force-evaluate` and commit the updated lock files. A new dependency also needs its entry in `THIRD-PARTY-NOTICES.md`.
